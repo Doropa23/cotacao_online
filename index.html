@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Cotação</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --blue:#1a4fa0;--blue-light:#e8f0fb;--border:#d0d5dd;
+  --text:#1a1a2e;--muted:#6b7280;--bg:#f0f3f8;--white:#fff;
+  --red:#c0392b;--green:#0d6e3f;--accent:#f0f4ff;--shadow:0 1px 4px rgba(0,0,0,.08);
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+
+/* TABS */
+.tabs{display:flex;background:var(--white);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.06);overflow-x:auto}
+.tab{padding:13px 20px;cursor:pointer;font-weight:600;font-size:12.5px;letter-spacing:.3px;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:6px}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);background:var(--accent)}
+.tab:hover:not(.active){background:#f9fafb;color:var(--text)}
+
+/* PANELS */
+.panel{display:none;padding:22px 28px;max-width:1140px;margin:0 auto}
+.panel.active{display:block}
+.section-title{font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:22px 0 10px;border-bottom:1px solid var(--border);padding-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.section-title:first-child{margin-top:0}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.form-grid.c3{grid-template-columns:1fr 1fr 1fr}
+.form-grid.c4{grid-template-columns:1fr 1fr 1fr 1fr}
+.field{display:flex;flex-direction:column;gap:4px}
+.field.s2{grid-column:span 2}
+.field.s3{grid-column:span 3}
+label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+input,select,textarea{padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--white);transition:border-color .2s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(26,79,160,.09)}
+textarea{resize:vertical;min-height:58px}
+
+/* ITEMS TABLE */
+.items-wrap{background:var(--white);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-top:8px}
+.items-head{display:grid;grid-template-columns:36px 88px 1fr 72px 68px 90px 62px 88px 68px 38px;background:#eef2fc;padding:7px 12px;font-size:10.5px;font-weight:700;color:var(--blue);letter-spacing:.5px;text-transform:uppercase;gap:7px;align-items:center}
+.item-row{display:grid;grid-template-columns:36px 88px 1fr 72px 68px 90px 62px 88px 68px 38px;padding:7px 12px;border-top:1px solid #f0f0f0;gap:7px;align-items:center}
+.item-row:hover{background:#fafbff}
+.item-row input,.item-row select{padding:5px 7px;font-size:12px;border-radius:4px}
+.item-num{font-size:11px;color:var(--muted);text-align:center;font-weight:700}
+.total-liq{font-size:12px;font-weight:700;color:var(--green);text-align:right}
+.btn-del{background:none;border:none;cursor:pointer;color:#ccc;font-size:18px;padding:2px 5px;border-radius:4px;transition:color .15s;line-height:1}
+.btn-del:hover{color:var(--red)}
+.btn-prod{background:#e8f0fb;border:1px solid #c5d8f7;cursor:pointer;color:var(--blue);font-size:11px;padding:3px 7px;border-radius:4px;font-weight:600;white-space:nowrap;transition:all .15s}
+.btn-prod:hover{background:var(--blue);color:#fff}
+.items-foot{padding:9px 12px;background:#fafbff;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+
+/* TOTALS */
+.totals-box{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:15px 20px;margin-top:14px;max-width:380px;margin-left:auto}
+.tot-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px}
+.tot-row.sep{border-top:1px solid var(--border);margin-top:4px;padding-top:9px}
+.tot-row.grand{font-size:16px;font-weight:700;color:var(--blue);border-top:2px solid var(--blue);margin-top:6px;padding-top:8px}
+.extenso-box{background:#f0f4ff;border:1px solid #c5d8f7;border-radius:6px;padding:8px 12px;margin-top:10px;font-size:11.5px;color:var(--blue);font-style:italic;line-height:1.5}
+
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:hover{background:#163d82}
+.btn-secondary{background:var(--white);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--bg)}
+.btn-success{background:#0d6e3f;color:#fff}
+.btn-success:hover{background:#0a5530}
+.btn-danger{background:#c0392b;color:#fff}
+.btn-danger:hover{background:#a32420}
+.btn-warning{background:#b45309;color:#fff}
+.btn-warning:hover{background:#92400e}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn-bar{display:flex;gap:9px;margin-top:22px;flex-wrap:wrap;align-items:center}
+
+/* LOGO UPLOAD */
+.logo-drop{border:2px dashed var(--border);border-radius:8px;padding:22px;text-align:center;cursor:pointer;transition:all .2s;background:var(--white)}
+.logo-drop:hover{border-color:var(--blue);background:var(--accent)}
+.logo-drop img{max-height:80px;max-width:240px;display:block;margin:0 auto 8px}
+.logo-drop p{font-size:12px;color:var(--muted)}
+
+/* CARD */
+.card{background:var(--white);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card-title{font-size:13.5px;font-weight:700;margin-bottom:14px;color:var(--text);display:flex;align-items:center;gap:6px}
+.alert{padding:9px 13px;border-radius:6px;font-size:12px;margin-bottom:10px}
+.alert-info{background:#e8f0fb;color:var(--blue);border:1px solid #c5d8f7}
+.alert-success{background:#e8f8ef;color:#0d6e3f;border:1px solid #b2e0c8}
+
+/* SAVED LIST */
+.cot-list{display:flex;flex-direction:column;gap:10px}
+.cot-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow);transition:box-shadow .15s}
+.cot-card:hover{box-shadow:0 3px 12px rgba(0,0,0,.12)}
+.cot-card-num{font-size:13px;font-weight:700;color:var(--blue);min-width:130px}
+.cot-card-cli{font-size:13px;font-weight:600;flex:1}
+.cot-card-meta{font-size:11px;color:var(--muted);min-width:100px;text-align:right}
+.cot-card-total{font-size:13px;font-weight:700;color:var(--green);min-width:110px;text-align:right}
+.cot-card-actions{display:flex;gap:6px}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-state .big{font-size:40px;margin-bottom:10px}
+
+/* CLIENTES / PRODUTOS MODAL LIST */
+.modal-item-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;max-height:340px;overflow-y:auto;padding-right:4px}
+.modal-item-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:all .15s;box-shadow:var(--shadow)}
+.modal-item-card:hover{border-color:var(--blue);background:var(--accent)}
+.modal-item-name{font-size:12.5px;font-weight:700;margin-bottom:2px}
+.modal-item-detail{font-size:11px;color:var(--muted)}
+.modal-item-actions{display:flex;justify-content:flex-end;gap:5px;margin-top:7px}
+.modal-search{width:100%;padding:8px 11px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:12px}
+
+/* PREVIEW */
+#preview-wrap{background:#ccc;padding:20px;min-height:300px;border-radius:8px}
+
+/* PRINT */
+@media print{
+  .no-print{display:none!important}
+}
+
+/* COTAÇÃO DOCUMENT — A4 flex column para assinaturas na base */
+.cot-doc{
+  background:#fff;width:210mm;min-height:auto;
+  margin:0 auto;padding:11mm 14mm;
+  font-family:Arial,Helvetica,sans-serif;font-size:11.5px;
+  color:#1a1a1a;box-shadow:0 2px 20px rgba(0,0,0,.18);
+  display:flex;flex-direction:column;
+}
+.cot-doc.preview-mode{min-height:297mm}
+.cot-doc-body{flex:1;display:flex;flex-direction:column}
+.cot-doc-footer{margin-top:auto;padding-top:6mm}
+.cot-doc table{width:100%;border-collapse:collapse}
+.cot-doc th{background:#1a4fa0;color:#fff;padding:5px 7px;font-size:10px;font-weight:700;text-align:left;text-transform:uppercase;letter-spacing:.4px}
+.cot-doc th.r,.cot-doc td.r{text-align:right}
+.cot-doc td{padding:5px 7px;border-bottom:1px solid #eee;font-size:11px;vertical-align:middle}
+.cot-doc tr:nth-child(even) td{background:#f9fbff}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:12px;padding:24px;width:92%;max-width:560px;box-shadow:0 8px 32px rgba(0,0,0,.18);max-height:90vh;overflow-y:auto}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text)}
+.modal .btn-bar{margin-top:16px}
+</style>
+</head>
+<body>
+
+<!-- TABS -->
+<div class="tabs no-print">
+  <div class="tab active" onclick="switchTab('cotacao')">📄 Nova Cotação</div>
+  <div class="tab" onclick="switchTab('guardadas')">🗂️ Cotações Guardadas</div>
+  <div class="tab" onclick="switchTab('produtos')">📦 Produtos</div>
+  <div class="tab" onclick="switchTab('preview')">👁️ Pré-visualizar</div>
+  <div class="tab" onclick="switchTab('config')">⚙️ Configurações</div>
+</div>
+
+<!-- ══════════════════════════════════ TAB: NOVA COTAÇÃO -->
+<div class="panel active" id="tab-cotacao">
+
+  <div class="section-title">Informações da Cotação</div>
+  <div class="form-grid c4">
+    <div class="field"><label>Nº Cotação</label><input type="text" id="cot-num" placeholder="0001/18062026"></div>
+    <div class="field"><label>Data</label><input type="date" id="cot-data"></div>
+    <div class="field"><label>Vencimento</label><input type="date" id="cot-venc"></div>
+    <div class="field"><label>Validade (dias)</label><input type="number" id="cot-validade" value="15" min="1"></div>
+  </div>
+  <div class="form-grid c3" style="margin-top:10px">
+    <div class="field">
+      <label>Moeda</label>
+      <select id="cot-moeda" onchange="calcTotals()">
+        <option value="MT">MT — Metical</option>
+        <option value="USD">USD — Dólar</option>
+        <option value="EUR">EUR — Euro</option>
+        <option value="ZAR">ZAR — Rand</option>
+      </select>
+    </div>
+    <div class="field"><label>Condição de Pagamento</label><input type="text" id="cot-cond" value="Pronto Pagamento"></div>
+    <div class="field"><label>Tempo de Execução</label><input type="text" id="cot-tempo" value="Entrega imediata"></div>
+  </div>
+
+  <div class="section-title" style="margin-top:20px">
+    <span>Cliente / Destinatário</span>
+    <button class="btn btn-secondary btn-sm" onclick="abrirModalClientes()">📋 Seleccionar Cliente</button>
+  </div>
+  <div class="form-grid">
+    <div class="field"><label>Nome do Cliente / Empresa</label><input type="text" id="cli-nome" placeholder="Nome do destinatário"></div>
+    <div class="field"><label>NUIT</label><input type="text" id="cli-nuit" placeholder="100000000"></div>
+    <div class="field"><label>Endereço</label><input type="text" id="cli-end" placeholder="Av. exemplo, Nº 123"></div>
+    <div class="field"><label>Cidade / País</label><input type="text" id="cli-cidade" placeholder="Maputo — Moçambique"></div>
+    <div class="field"><label>Telefone</label><input type="text" id="cli-tel" placeholder="(+258) 84 000 0000"></div>
+    <div class="field"><label>Email</label><input type="text" id="cli-email" placeholder="cliente@email.com"></div>
+  </div>
+  <div style="margin-top:8px">
+    <button class="btn btn-secondary btn-sm" onclick="guardarCliente()">💾 Guardar este cliente</button>
+  </div>
+
+  <div class="section-title" style="margin-top:20px">
+    <span>Itens da Cotação</span>
+  </div>
+  <div class="items-wrap">
+    <div class="items-head">
+      <div>#</div><div>Ref./Cód.</div><div>Descrição</div>
+      <div style="text-align:right">Qtd.</div><div>Un.</div>
+      <div style="text-align:right">Pr. Unit.</div>
+      <div style="text-align:right">IVA %</div>
+      <div style="text-align:right">Total Liq.</div>
+      <div>Produto</div>
+      <div></div>
+    </div>
+    <div id="items-body"></div>
+    <div class="items-foot">
+      <button class="btn btn-secondary btn-sm" onclick="addItem()">+ Adicionar Linha</button>
+    </div>
+  </div>
+
+  <div class="totals-box">
+    <div class="tot-row"><span style="color:var(--muted)">Subtotal</span><span id="t-sub">0,00</span></div>
+    <div class="tot-row"><span style="color:var(--muted)">Desconto Financeiro</span><span>0,00</span></div>
+    <div class="tot-row sep"><span style="color:var(--muted)">IVA</span><span id="t-iva">0,00</span></div>
+    <div class="tot-row grand"><span>Total</span><span id="t-total">0,00 MT</span></div>
+    <div class="extenso-box" id="t-extenso">—</div>
+  </div>
+
+  <div class="btn-bar">
+    <button class="btn btn-primary" onclick="switchTab('preview');gerarPreview()">👁️ Pré-visualizar</button>
+    <button class="btn btn-success" onclick="exportarPDF()">⬇️ Exportar PDF</button>
+    <button class="btn btn-secondary" onclick="guardarCotacao()">💾 Guardar Cotação</button>
+    <button class="btn btn-secondary" onclick="limparForm()">🗑️ Nova / Limpar</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ TAB: COTAÇÕES GUARDADAS -->
+<div class="panel" id="tab-guardadas">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="font-size:16px;font-weight:700">Cotações Guardadas</h2>
+    <button class="btn btn-primary btn-sm" onclick="switchTab('cotacao')">+ Nova Cotação</button>
+  </div>
+  <div id="cot-list-wrap"></div>
+</div>
+
+<!-- ══════════════════════════════════ TAB: PRODUTOS -->
+<div class="panel" id="tab-produtos">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <h2 style="font-size:16px;font-weight:700">Produtos Guardados</h2>
+    <button class="btn btn-primary btn-sm" onclick="abrirModalNovoProduto()">+ Novo Produto</button>
+  </div>
+  <div id="prod-list-wrap"></div>
+</div>
+
+<!-- ══════════════════════════════════ TAB: PRÉ-VISUALIZAR -->
+<div class="panel" id="tab-preview">
+  <div class="btn-bar no-print" style="margin-top:0;margin-bottom:14px">
+    <button class="btn btn-success" onclick="exportarPDF()">⬇️ Exportar PDF</button>
+    <button class="btn btn-secondary" onclick="switchTab('cotacao')">✏️ Editar</button>
+  </div>
+  <div id="preview-wrap">
+    <div id="cot-preview"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ TAB: CONFIGURAÇÕES -->
+<div class="panel" id="tab-config">
+  <div class="card">
+    <div class="card-title">☁️ Base de Dados (Google Sheets)</div>
+    <div class="alert alert-info" id="db-status-box">
+      <span id="db-status-dot">⚪</span> <span id="db-status-text">Ainda não ligado a nenhuma Base de Dados. Os dados estão a ser guardados apenas neste navegador.</span>
+    </div>
+    <div class="form-grid">
+      <div class="field s2">
+        <label>URL da Base de Dados (Google Apps Script — Web App)</label>
+        <input type="text" id="cfg-db-url" placeholder="https://script.google.com/macros/s/SEU_ID_AQUI/exec" value="https://script.google.com/macros/s/AKfycbwKXlhfQThj22L48rkNXRq29ItBumD5FORG-Aw-1dcFNqbdiOunKiDeN6jPk8K8CS5Y/exec">
+      </div>
+    </div>
+    <div class="btn-bar" style="margin-top:10px">
+      <button class="btn btn-primary btn-sm" onclick="ligarBaseDados()">🔌 Ligar / Testar</button>
+      <button class="btn btn-success btn-sm" onclick="sincronizarTudo()">🔄 Sincronizar Agora</button>
+    </div>
+    <p style="font-size:11px;color:var(--muted);margin-top:8px">
+      Veja o ficheiro <strong>Code.gs</strong> fornecido para instruções de como criar a Google Sheet e publicar o Apps Script. Cole aqui o URL terminado em <code>/exec</code>.
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🏢 Dados da Empresa Emissora</div>
+    <div class="form-grid">
+      <div class="field"><label>Nome da Empresa</label><input type="text" id="emp-nome" placeholder="M ZBRAIN Comércio &amp; Serviços"></div>
+      <div class="field"><label>NUIT</label><input type="text" id="emp-nuit" placeholder="123456789"></div>
+      <div class="field s2"><label>Endereço</label><input type="text" id="emp-end" placeholder="Av. União Africana, 346, Maputo"></div>
+      <div class="field"><label>Telefone / Celular</label><input type="text" id="emp-tel" placeholder="(+258) 84 000 0000"></div>
+      <div class="field"><label>Email</label><input type="text" id="emp-email" placeholder="geral@empresa.co.mz"></div>
+      <div class="field"><label>Website</label><input type="text" id="emp-web" placeholder="www.empresa.co.mz"></div>
+      <div class="field"><label>Cidade / País</label><input type="text" id="emp-cidade" placeholder="Maputo — Moçambique"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🖼️ Logotipo</div>
+    <div class="alert alert-info">Faça upload do logotipo (PNG, JPG ou SVG). Aparecerá no cabeçalho da cotação.</div>
+    <div class="logo-drop" id="logo-drop" onclick="document.getElementById('logo-input').click()">
+      <img id="logo-preview" src="" alt="" style="display:none">
+      <p id="logo-text">Clique aqui ou arraste o logotipo</p>
+      <p style="font-size:11px;color:#aaa;margin-top:4px">PNG, JPG ou SVG • máx. 2 MB</p>
+    </div>
+    <input type="file" id="logo-input" accept="image/*" style="display:none" onchange="handleLogo(event)">
+    <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="removerLogo()">Remover logotipo</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🎨 Aparência</div>
+    <div class="form-grid">
+      <div class="field"><label>Cor Principal</label><input type="color" id="cfg-cor" value="#1a4fa0" style="height:38px;cursor:pointer"></div>
+      <div class="field"><label>Prefixo Numeração</label><input type="text" id="cfg-prefix" placeholder="COT- ou deixar vazio"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📝 Rodapé da Cotação</div>
+    <div class="field">
+      <label>Texto do Rodapé</label>
+      <textarea id="cfg-rodape" rows="3" placeholder="Documento Processado por Computador — Validade sujeita a alterações de preço do fornecedor."></textarea>
+    </div>
+  </div>
+
+  <div class="btn-bar">
+    <button class="btn btn-primary" onclick="salvarConfig()">💾 Guardar Configurações</button>
+    <button class="btn btn-secondary" onclick="carregarConfig()">↩️ Repor</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ MODAL: CLIENTES -->
+<div class="modal-bg" id="modal-clientes">
+  <div class="modal">
+    <h3>📋 Clientes Guardados</h3>
+    <input class="modal-search" id="search-cli" placeholder="🔍 Pesquisar cliente..." oninput="renderModalClientes()">
+    <div id="modal-cli-list"></div>
+    <div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ MODAL: PRODUTOS (seleccionar para item) -->
+<div class="modal-bg" id="modal-produtos-sel">
+  <div class="modal">
+    <h3>📦 Seleccionar Produto</h3>
+    <input class="modal-search" id="search-prod-sel" placeholder="🔍 Pesquisar produto..." oninput="renderModalProdutosSel()">
+    <div id="modal-prod-sel-list"></div>
+    <div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ MODAL: NOVO / EDITAR PRODUTO -->
+<div class="modal-bg" id="modal-novo-produto">
+  <div class="modal">
+    <h3 id="modal-prod-titulo">📦 Novo Produto</h3>
+    <input type="hidden" id="prod-edit-id">
+    <div class="form-grid" style="gap:10px">
+      <div class="field"><label>Referência / Código</label><input type="text" id="prod-ref" placeholder="REF001"></div>
+      <div class="field"><label>Unidade</label>
+        <select id="prod-un">
+          <option>Un</option><option>Kg</option><option>Lt</option><option>M</option>
+          <option>M²</option><option>M³</option><option>Cx</option><option>Pc</option>
+          <option>Ct</option><option>Hr</option><option>Vb</option><option>Sv</option>
+        </select>
+      </div>
+      <div class="field s2"><label>Descrição</label><input type="text" id="prod-desc" placeholder="Descrição completa do produto"></div>
+      <div class="field"><label>Preço Unitário (padrão)</label><input type="number" id="prod-pu" placeholder="0.00" min="0" step="0.01"></div>
+      <div class="field"><label>IVA % (padrão)</label>
+        <select id="prod-iva">
+          <option value="0">0%</option><option value="5">5%</option>
+          <option value="10">10%</option><option value="16" selected>16%</option>
+          <option value="17">17%</option><option value="20">20%</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-bar">
+      <button class="btn btn-primary" onclick="salvarProduto()">💾 Guardar</button>
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ MODAL: CONFIRMAR GUARDAR COT -->
+<div class="modal-bg" id="modal-guardar">
+  <div class="modal">
+    <h3>💾 Guardar Cotação</h3>
+    <p style="font-size:13px;color:var(--muted);margin-bottom:12px">A cotação será guardada localmente. Os produtos novos serão adicionados ao catálogo.</p>
+    <div class="alert alert-success" id="guardar-info" style="display:none"></div>
+    <div class="btn-bar">
+      <button class="btn btn-primary" onclick="confirmarGuardar()">Guardar</button>
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ────────── STATE */
+let items = [];
+let itemIdx = 0;
+let logoData = '';
+let _itemParaSel = null; // id do item que pediu selecção de produto
+
+/* ════════════════════════════════════════════════════════════════
+   CAMADA DE BASE DE DADOS (Google Sheets via Apps Script)
+   ────────────────────────────────────────────────────────────────
+   localStorage continua a ser usado como cache local (a app abre
+   instantaneamente e funciona offline). Sempre que existir um URL
+   de base de dados configurado, cada operação de guardar/apagar é
+   também enviada para a Google Sheet em segundo plano.
+   ════════════════════════════════════════════════════════════════ */
+
+// URL padrão de fábrica da Base de Dados (Google Apps Script). Pode ser
+// substituído a qualquer momento no separador Configurações.
+const DB_URL_PADRAO = 'https://script.google.com/macros/s/AKfycbwKXlhfQThj22L48rkNXRq29ItBumD5FORG-Aw-1dcFNqbdiOunKiDeN6jPk8K8CS5Y/exec';
+
+function getDbUrl() {
+  const guardado = (localStorage.getItem('cfg-db-url') || '').trim();
+  return guardado || DB_URL_PADRAO;
+}
+function temDB() { return !!getDbUrl(); }
+
+async function dbCall(action, payload) {
+  const url = getDbUrl();
+  if (!url) return null;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      mode: 'cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight CORS
+      body: JSON.stringify({ action, ...payload })
+    });
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status + ' ' + res.statusText);
+    }
+    const texto = await res.text();
+    try {
+      return JSON.parse(texto);
+    } catch (parseErr) {
+      // a resposta não é JSON — normalmente é uma página de login/erro do Google
+      throw new Error('Resposta inesperada do servidor (não é JSON). Verifique se a implementação está activa e com acesso "Qualquer pessoa".');
+    }
+  } catch (err) {
+    console.error('Erro de ligação à Base de Dados:', err);
+    setDbStatus(false, '❌ ' + (err.message || 'Falha de ligação') + ' — a trabalhar apenas localmente.');
+    return null;
+  }
+}
+
+function setDbStatus(online, msg) {
+  const dot = document.getElementById('db-status-dot');
+  const txt = document.getElementById('db-status-text');
+  const box = document.getElementById('db-status-box');
+  if (!dot) return;
+  dot.textContent = online ? '🟢' : (temDB() ? '🔴' : '⚪');
+  txt.textContent = msg;
+  box.className = 'alert ' + (online ? 'alert-success' : 'alert-info');
+}
+
+async function ligarBaseDados() {
+  const url = gv('cfg-db-url').trim();
+  if (!url) { showToast('⚠️ Cole o URL da Base de Dados primeiro.'); return; }
+  localStorage.setItem('cfg-db-url', url);
+  showToast('🔌 A testar ligação...');
+  setDbStatus(false, 'A testar ligação...');
+  const r = await dbCall('ping', {});
+  if (r && r.ok) {
+    setDbStatus(true, 'Ligado com sucesso à Base de Dados Google Sheets. A sincronizar...');
+    showToast('✅ Ligado à Base de Dados!');
+    await sincronizarTudo();
+  } else {
+    // dbCall já actualizou db-status-text com a mensagem de erro real, se a houver
+    showToast('❌ Falha ao ligar à Base de Dados. Veja a mensagem em Configurações.');
+  }
+}
+
+/* Puxa tudo da Sheet e actualiza o cache local (usado ao ligar e a pedido) */
+async function sincronizarTudo() {
+  if (!temDB()) return;
+  const r = await dbCall('getAll', {});
+  if (!r || !r.ok) { setDbStatus(false, 'Falha ao sincronizar.'); return; }
+
+  // Config da empresa
+  if (r.config) {
+    Object.keys(r.config).forEach(k => {
+      if (r.config[k] !== '' && r.config[k] != null) localStorage.setItem(k, r.config[k]);
+    });
+    carregarConfig();
+  }
+  // Clientes
+  if (Array.isArray(r.clientes)) {
+    localStorage.setItem('clientes', JSON.stringify(r.clientes.map(c => ({...c, id: normId(c.id)}))));
+  }
+  // Produtos
+  if (Array.isArray(r.produtos)) {
+    localStorage.setItem('produtos', JSON.stringify(r.produtos.map(p => ({...p, id: normId(p.id), pu: +p.pu||0, iva: +p.iva||0}))));
+  }
+  // Cotações
+  if (Array.isArray(r.cotacoes)) {
+    const cots = r.cotacoes.map(c => ({
+      ...c,
+      sub: +c.sub||0, iva: +c.iva||0, total: +c.total||0,
+      items: Array.isArray(c.items) ? c.items : []
+    }));
+    localStorage.setItem('cotacoes', JSON.stringify(cots));
+  }
+  setDbStatus(true, 'Ligado e sincronizado com a Base de Dados Google Sheets.');
+  showToast('🔄 Sincronização concluída!');
+  // re-renderiza os ecrãs visíveis, se aplicável
+  const ativo = document.querySelector('.tab.active');
+  if (ativo) {
+    if (document.getElementById('tab-guardadas').classList.contains('active')) renderCotList();
+    if (document.getElementById('tab-produtos').classList.contains('active')) renderProdList();
+  }
+}
+
+// IDs vindos da Sheet podem chegar como número (Google Sheets converte strings numéricas) — normaliza para string/number consistente
+function normId(id) { return (typeof id === 'number') ? id : (isNaN(+id) ? id : +id); }
+
+/* ────────── INIT */
+document.addEventListener('DOMContentLoaded', () => {
+  carregarConfig();
+  setDefaultDates();
+  autoNum();
+  addItem();
+  const drop = document.getElementById('logo-drop');
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor='#1a4fa0'; });
+  drop.addEventListener('dragleave', () => { drop.style.borderColor=''; });
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.style.borderColor=''; if(e.dataTransfer.files[0]) loadLogo(e.dataTransfer.files[0]); });
+
+  const dbUrl = getDbUrl();
+  const dbInput = document.getElementById('cfg-db-url');
+  if (dbInput) dbInput.value = dbUrl;
+  if (dbUrl) {
+    if (!localStorage.getItem('cfg-db-url')) localStorage.setItem('cfg-db-url', dbUrl);
+    setDbStatus(false, 'A ligar à Base de Dados...');
+    dbCall('ping', {}).then(r => {
+      if (r && r.ok) { setDbStatus(true, 'Ligado à Base de Dados Google Sheets.'); sincronizarTudo(); }
+      else setDbStatus(false, 'Não foi possível ligar agora. A trabalhar com a última cópia local.');
+    });
+  } else {
+    setDbStatus(false, 'Ainda não ligado a nenhuma Base de Dados. Os dados estão a ser guardados apenas neste navegador.');
+  }
+});
+
+function setDefaultDates() {
+  const h = new Date();
+  document.getElementById('cot-data').value = h.toISOString().split('T')[0];
+  const v = new Date(h); v.setDate(v.getDate()+15);
+  document.getElementById('cot-venc').value = v.toISOString().split('T')[0];
+}
+
+function autoNum() {
+  const seq = parseInt(localStorage.getItem('cotSeq') || 0) + 1;
+  const prefix = localStorage.getItem('cfg-prefix') || '';
+  const seqStr = String(seq).padStart(4, '0');
+  const hoje = new Date();
+  const dd = String(hoje.getDate()).padStart(2, '0');
+  const mm = String(hoje.getMonth() + 1).padStart(2, '0');
+  const aaaa = hoje.getFullYear();
+  document.getElementById('cot-num').value = prefix + seqStr + '/' + dd + mm + aaaa;
+}
+
+/* ────────── TABS */
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const map = {cotacao:0, guardadas:1, produtos:2, preview:3, config:4};
+  document.querySelectorAll('.tab')[map[id]].classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+  if (id==='preview') gerarPreview();
+  if (id==='guardadas') renderCotList();
+  if (id==='produtos') renderProdList();
+}
+
+/* ────────── ITEMS */
+function addItem() {
+  items.push({id:++itemIdx, ref:'', desc:'', qtd:1, un:'Un', pu:0, iva:16});
+  renderItems();
+}
+
+function removeItem(id) {
+  items = items.filter(i=>i.id!==id);
+  renderItems();
+}
+
+function renderItems() {
+  const body = document.getElementById('items-body');
+  body.innerHTML = '';
+  items.forEach((it, idx) => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = `
+      <div class="item-num">${String(idx+1).padStart(2,'0')}</div>
+      <input type="text" value="${esc(it.ref)}" placeholder="REF" oninput="updateItem(${it.id},'ref',this.value)">
+      <input type="text" value="${esc(it.desc)}" placeholder="Descrição" oninput="updateItem(${it.id},'desc',this.value)" style="width:100%">
+      <input type="number" value="${it.qtd}" min="0" step="0.01" oninput="updateItem(${it.id},'qtd',+this.value)" style="text-align:right">
+      <select oninput="updateItem(${it.id},'un',this.value)" style="font-size:11px">
+        ${['Kg','Un','Lt','M','M²','M³','Cx','Pc','Ct','Hr','Vb','Sv'].map(u=>`<option${u===it.un?' selected':''}>${u}</option>`).join('')}
+      </select>
+      <input type="number" value="${it.pu}" min="0" step="0.01" oninput="updateItem(${it.id},'pu',+this.value)" style="text-align:right">
+      <select oninput="updateItem(${it.id},'iva',+this.value)" style="font-size:11px">
+        ${[0,5,10,16,17,20].map(r=>`<option value="${r}"${r===it.iva?' selected':''}>${r}%</option>`).join('')}
+      </select>
+      <div class="total-liq" id="tliq-${it.id}">${fmt(calcLiq(it))}</div>
+      <button class="btn-prod" onclick="abrirProdSel(${it.id})" title="Seleccionar produto do catálogo">📦</button>
+      <button class="btn-del" onclick="removeItem(${it.id})">×</button>`;
+    body.appendChild(row);
+  });
+  calcTotals();
+}
+
+function updateItem(id, field, val) {
+  const it = items.find(i=>i.id===id);
+  if (it) it[field] = val;
+  const el = document.getElementById('tliq-'+id);
+  if (el) el.textContent = fmt(calcLiq(it));
+  calcTotals();
+}
+
+function calcLiq(it) { return it.qtd * it.pu; }
+
+function calcTotals() {
+  let sub=0, iva=0;
+  items.forEach(it => { const b=calcLiq(it); sub+=b; iva+=b*(it.iva/100); });
+  const moeda = gv('cot-moeda') || 'MT';
+  const total = sub + iva;
+  document.getElementById('t-sub').textContent   = fmt(sub);
+  document.getElementById('t-iva').textContent   = fmt(iva);
+  document.getElementById('t-total').textContent = fmt(total) + ' ' + moeda;
+  document.getElementById('t-extenso').textContent = valorPorExtenso(total, moeda);
+}
+
+/* ────────── CONFIG */
+function salvarConfig() {
+  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape']
+    .forEach(f => localStorage.setItem(f, document.getElementById(f).value));
+  localStorage.setItem('cfg-cor', document.getElementById('cfg-cor').value);
+  if (logoData) localStorage.setItem('logoData', logoData);
+
+  const dbUrlAntes = getDbUrl();
+  const dbUrlNovo = gv('cfg-db-url').trim();
+  if (dbUrlNovo !== dbUrlAntes) localStorage.setItem('cfg-db-url', dbUrlNovo);
+
+  showToast('✅ Configurações guardadas!');
+
+  if (temDB()) {
+    const cfg = {};
+    ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape','cfg-cor']
+      .forEach(f => cfg[f] = gv(f));
+    dbCall('saveConfig', { config: cfg }).then(r => {
+      if (r && r.ok) setDbStatus(true, 'Configurações sincronizadas com a Base de Dados.');
+    });
+  }
+}
+
+function carregarConfig() {
+  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape']
+    .forEach(f => { const v=localStorage.getItem(f); if(v && document.getElementById(f)) document.getElementById(f).value=v; });
+  const cor = localStorage.getItem('cfg-cor');
+  if (cor) document.getElementById('cfg-cor').value = cor;
+  const ld = localStorage.getItem('logoData');
+  if (ld) { logoData=ld; showLogoPreview(ld); }
+}
+
+/* ────────── LOGO */
+function handleLogo(e) { if(e.target.files[0]) loadLogo(e.target.files[0]); }
+function loadLogo(file) {
+  const r = new FileReader();
+  r.onload = e => { logoData=e.target.result; showLogoPreview(e.target.result); };
+  r.readAsDataURL(file);
+}
+function showLogoPreview(src) {
+  const img = document.getElementById('logo-preview');
+  img.src=src; img.style.display='block';
+  document.getElementById('logo-text').textContent='Clique para substituir';
+}
+function removerLogo() {
+  logoData=''; localStorage.removeItem('logoData');
+  document.getElementById('logo-preview').style.display='none';
+  document.getElementById('logo-text').textContent='Clique aqui ou arraste o logotipo';
+}
+
+/* ────────── CLIENTES */
+function guardarCliente() {
+  const nome = gv('cli-nome').trim();
+  if (!nome) { showToast('⚠️ Indique o nome do cliente primeiro.'); return; }
+  const clientes = JSON.parse(localStorage.getItem('clientes')||'[]');
+  const cli = {id:Date.now(), nome, nuit:gv('cli-nuit'), end:gv('cli-end'), cidade:gv('cli-cidade'), tel:gv('cli-tel'), email:gv('cli-email')};
+  const idx = clientes.findIndex(c=>c.nome.toLowerCase()===nome.toLowerCase());
+  if (idx>=0) { cli.id = clientes[idx].id; clientes[idx]=cli; } else clientes.unshift(cli);
+  localStorage.setItem('clientes', JSON.stringify(clientes));
+  showToast('✅ Cliente guardado!');
+  if (temDB()) dbCall('saveCliente', { cliente: cli });
+}
+
+function abrirModalClientes() {
+  document.getElementById('search-cli').value = '';
+  renderModalClientes();
+  document.getElementById('modal-clientes').classList.add('open');
+}
+
+function renderModalClientes() {
+  const q = document.getElementById('search-cli').value.toLowerCase();
+  let clientes = JSON.parse(localStorage.getItem('clientes')||'[]');
+  if (q) clientes = clientes.filter(c => (c.nome+c.nuit+c.tel).toLowerCase().includes(q));
+  const wrap = document.getElementById('modal-cli-list');
+  if (!clientes.length) {
+    wrap.innerHTML='<p style="text-align:center;color:var(--muted);padding:16px">Nenhum cliente encontrado.</p>'; return;
+  }
+  wrap.innerHTML = '<div class="modal-item-grid">'+clientes.map(c=>`
+    <div class="modal-item-card">
+      <div class="modal-item-name">${esc(c.nome)}</div>
+      <div class="modal-item-detail">${[c.nuit?'NUIT: '+c.nuit:'', c.tel, c.cidade].filter(Boolean).join(' · ')}</div>
+      <div class="modal-item-actions">
+        <button class="btn btn-primary btn-sm" onclick="selecionarCliente(${c.id})">Seleccionar</button>
+        <button class="btn btn-danger btn-sm" onclick="apagarCliente(${c.id})">✕</button>
+      </div>
+    </div>`).join('')+'</div>';
+}
+
+function selecionarCliente(id) {
+  const c = JSON.parse(localStorage.getItem('clientes')||'[]').find(x=>x.id===id);
+  if (!c) return;
+  ['nome','nuit','end','cidade','tel','email'].forEach(f => {
+    document.getElementById('cli-'+f).value = c[f] || '';
+  });
+  fecharModal();
+}
+
+function apagarCliente(id) {
+  let cls = JSON.parse(localStorage.getItem('clientes')||'[]').filter(c=>c.id!==id);
+  localStorage.setItem('clientes', JSON.stringify(cls));
+  renderModalClientes();
+  if (temDB()) dbCall('deleteCliente', { id });
+}
+
+/* ────────── PRODUTOS */
+function getProdutos() { return JSON.parse(localStorage.getItem('produtos')||'[]'); }
+function setProdutos(p) { localStorage.setItem('produtos', JSON.stringify(p)); }
+
+function guardarProdutosDaCotacao() {
+  // Auto-save all items as products if they have ref+desc
+  let prods = getProdutos();
+  const alterados = [];
+  items.forEach(it => {
+    if (!it.ref.trim() && !it.desc.trim()) return;
+    const key = (it.ref+it.desc).toLowerCase().trim();
+    if (!key) return;
+    const existe = prods.findIndex(p => (p.ref+p.desc).toLowerCase().trim() === key);
+    const prod = {id: existe>=0 ? prods[existe].id : Date.now()+Math.random(), ref:it.ref, desc:it.desc, un:it.un, pu:it.pu, iva:it.iva};
+    if (existe>=0) prods[existe]=prod; else prods.unshift(prod);
+    alterados.push(prod);
+  });
+  setProdutos(prods);
+  if (temDB()) alterados.forEach(p => dbCall('saveProduto', { produto: p }));
+}
+
+function renderProdList() {
+  const prods = getProdutos();
+  const wrap = document.getElementById('prod-list-wrap');
+  if (!prods.length) {
+    wrap.innerHTML=`<div class="empty-state"><div class="big">📦</div><p style="font-size:14px;font-weight:600">Nenhum produto guardado</p><p style="margin-top:6px;font-size:12px">Os produtos são guardados automaticamente ao guardar cotações, ou adicione manualmente.</p></div>`;
+    return;
+  }
+  wrap.innerHTML=`
+    <input style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:14px" placeholder="🔍 Pesquisar produto..." oninput="filtrarProdList(this.value)" id="prod-list-search">
+    <div id="prod-list-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px">
+    ${prods.map(p=>`
+      <div class="card" style="margin-bottom:0;padding:12px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--blue)">${esc(p.ref)||'—'}</div>
+            <div style="font-size:13px;font-weight:700;margin:2px 0">${esc(p.desc)||'—'}</div>
+            <div style="font-size:11px;color:var(--muted)">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%</div>
+          </div>
+          <div style="display:flex;gap:5px;margin-left:8px">
+            <button class="btn btn-warning btn-sm" onclick="editarProduto(${p.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="apagarProduto(${p.id})">✕</button>
+          </div>
+        </div>
+      </div>`).join('')}
+    </div>`;
+}
+
+function filtrarProdList(q) {
+  const prods = getProdutos();
+  const filtrado = q ? prods.filter(p=>(p.ref+p.desc).toLowerCase().includes(q.toLowerCase())) : prods;
+  document.getElementById('prod-list-cards').innerHTML = filtrado.map(p=>`
+    <div class="card" style="margin-bottom:0;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--blue)">${esc(p.ref)||'—'}</div>
+          <div style="font-size:13px;font-weight:700;margin:2px 0">${esc(p.desc)||'—'}</div>
+          <div style="font-size:11px;color:var(--muted)">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%</div>
+        </div>
+        <div style="display:flex;gap:5px;margin-left:8px">
+          <button class="btn btn-warning btn-sm" onclick="editarProduto(${p.id})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="apagarProduto(${p.id})">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function abrirModalNovoProduto() {
+  document.getElementById('modal-prod-titulo').textContent = '📦 Novo Produto';
+  document.getElementById('prod-edit-id').value = '';
+  ['prod-ref','prod-desc'].forEach(f=>document.getElementById(f).value='');
+  document.getElementById('prod-pu').value = '';
+  document.getElementById('prod-un').value = 'Un';
+  document.getElementById('prod-iva').value = '16';
+  document.getElementById('modal-novo-produto').classList.add('open');
+}
+
+function editarProduto(id) {
+  const p = getProdutos().find(x=>x.id===id);
+  if (!p) return;
+  document.getElementById('modal-prod-titulo').textContent = '✏️ Editar Produto';
+  document.getElementById('prod-edit-id').value = id;
+  document.getElementById('prod-ref').value = p.ref||'';
+  document.getElementById('prod-desc').value = p.desc||'';
+  document.getElementById('prod-pu').value = p.pu||0;
+  document.getElementById('prod-un').value = p.un||'Un';
+  document.getElementById('prod-iva').value = p.iva||16;
+  document.getElementById('modal-novo-produto').classList.add('open');
+}
+
+function salvarProduto() {
+  const ref  = document.getElementById('prod-ref').value.trim();
+  const desc = document.getElementById('prod-desc').value.trim();
+  if (!ref && !desc) { showToast('⚠️ Preencha pelo menos a referência ou descrição.'); return; }
+  let prods = getProdutos();
+  const editId = document.getElementById('prod-edit-id').value;
+  const prod = {
+    id: editId ? +editId : Date.now(),
+    ref, desc,
+    un:  document.getElementById('prod-un').value,
+    pu:  parseFloat(document.getElementById('prod-pu').value)||0,
+    iva: parseInt(document.getElementById('prod-iva').value)||16
+  };
+  if (editId) { const i=prods.findIndex(p=>p.id===+editId); if(i>=0) prods[i]=prod; }
+  else prods.unshift(prod);
+  setProdutos(prods);
+  fecharModal();
+  renderProdList();
+  showToast('✅ Produto guardado!');
+  if (temDB()) dbCall('saveProduto', { produto: prod });
+}
+
+function apagarProduto(id) {
+  if (!confirm('Apagar este produto?')) return;
+  setProdutos(getProdutos().filter(p=>p.id!==id));
+  renderProdList();
+  if (temDB()) dbCall('deleteProduto', { id });
+}
+
+/* Seleccionar produto para preencher item */
+function abrirProdSel(itemId) {
+  _itemParaSel = itemId;
+  document.getElementById('search-prod-sel').value = '';
+  renderModalProdutosSel();
+  document.getElementById('modal-produtos-sel').classList.add('open');
+}
+
+function renderModalProdutosSel() {
+  const q = document.getElementById('search-prod-sel').value.toLowerCase();
+  let prods = getProdutos();
+  if (q) prods = prods.filter(p=>(p.ref+p.desc).toLowerCase().includes(q));
+  const wrap = document.getElementById('modal-prod-sel-list');
+  if (!prods.length) {
+    wrap.innerHTML='<p style="text-align:center;color:var(--muted);padding:16px">Nenhum produto encontrado.</p>'; return;
+  }
+  wrap.innerHTML='<div class="modal-item-grid">'+prods.map(p=>`
+    <div class="modal-item-card" onclick="selecionarProduto(${p.id})">
+      <div class="modal-item-name">${esc(p.ref)||'—'} — ${esc(p.desc)||'—'}</div>
+      <div class="modal-item-detail">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%</div>
+    </div>`).join('')+'</div>';
+}
+
+function selecionarProduto(prodId) {
+  const p = getProdutos().find(x=>x.id===prodId);
+  if (!p || !_itemParaSel) return;
+  const it = items.find(i=>i.id===_itemParaSel);
+  if (!it) return;
+  it.ref=p.ref; it.desc=p.desc; it.un=p.un; it.pu=p.pu; it.iva=p.iva;
+  _itemParaSel = null;
+  fecharModal();
+  renderItems();
+}
+
+/* ────────── GUARDAR COTAÇÃO */
+function guardarCotacao() {
+  const num = gv('cot-num').trim();
+  if (!num) { showToast('⚠️ Indique o número da cotação.'); return; }
+  const cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
+  const info = document.getElementById('guardar-info');
+  info.style.display='none';
+  if (cots.find(c=>c.num===num)) {
+    info.textContent='Já existe uma cotação com este número. Será substituída.';
+    info.style.display='block';
+  }
+  document.getElementById('modal-guardar').classList.add('open');
+}
+
+function confirmarGuardar() {
+  const num = gv('cot-num').trim();
+  let sub=0, iva=0;
+  items.forEach(it=>{ const b=calcLiq(it); sub+=b; iva+=b*(it.iva/100); });
+  const cot = {
+    num, data:gv('cot-data'), venc:gv('cot-venc'), validade:gv('cot-validade'),
+    moeda:gv('cot-moeda'), cond:gv('cot-cond'), tempo:gv('cot-tempo'),
+    cliNome:gv('cli-nome'), cliNuit:gv('cli-nuit'), cliEnd:gv('cli-end'),
+    cliCidade:gv('cli-cidade'), cliTel:gv('cli-tel'), cliEmail:gv('cli-email'),
+    items:JSON.parse(JSON.stringify(items)), sub, iva, total:sub+iva,
+    savedAt:new Date().toISOString()
+  };
+  let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
+  const idx = cots.findIndex(c=>c.num===num);
+  if (idx>=0) cots[idx]=cot; else cots.unshift(cot);
+  localStorage.setItem('cotacoes', JSON.stringify(cots));
+  // auto-increment seq
+  const m = num.match(/(\d+)\//);
+  if (m) localStorage.setItem('cotSeq', parseInt(m[1]));
+  // guardar produtos automaticamente
+  guardarProdutosDaCotacao();
+  fecharModal();
+  showToast('✅ Cotação '+num+' guardada! Produtos actualizados.');
+  if (temDB()) {
+    dbCall('saveCotacao', { cotacao: cot }).then(r => {
+      if (r && r.ok) setDbStatus(true, 'Cotação sincronizada com a Base de Dados.');
+    });
+  }
+}
+
+/* ────────── RENDER COT LIST */
+function renderCotList() {
+  const cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
+  const wrap = document.getElementById('cot-list-wrap');
+  if (!cots.length) {
+    wrap.innerHTML=`<div class="empty-state"><div class="big">🗂️</div><p style="font-size:14px;font-weight:600">Nenhuma cotação guardada</p><p style="margin-top:6px;font-size:12px">Crie uma nova cotação e clique em "Guardar Cotação".</p></div>`;
+    return;
+  }
+  wrap.innerHTML='<div class="cot-list">'+cots.map(c=>`
+    <div class="cot-card">
+      <div class="cot-card-num">📄 ${esc(c.num)}</div>
+      <div class="cot-card-cli">${esc(c.cliNome||'—')}</div>
+      <div class="cot-card-meta">${fmtDate(c.data)}</div>
+      <div class="cot-card-total">${fmt(c.total)} ${c.moeda}</div>
+      <div class="cot-card-actions">
+        <button class="btn btn-primary btn-sm" onclick="carregarCotacao('${esc(c.num)}')">✏️ Editar</button>
+        <button class="btn btn-success btn-sm" onclick="previewCotacao('${esc(c.num)}')">👁️</button>
+        <button class="btn btn-danger btn-sm" onclick="apagarCotacao('${esc(c.num)}')">🗑️</button>
+      </div>
+    </div>`).join('')+'</div>';
+}
+
+function carregarCotacao(num) {
+  const c = JSON.parse(localStorage.getItem('cotacoes')||'[]').find(x=>x.num===num);
+  if (!c) return;
+  ['num','data','venc','validade','moeda','cond','tempo'].forEach(f => {
+    const el = document.getElementById('cot-'+f); if(el) el.value=c[f]||'';
+  });
+  ['nome','nuit','end','cidade','tel','email'].forEach(f => {
+    const el = document.getElementById('cli-'+f);
+    if(el) el.value = c['cli'+f.charAt(0).toUpperCase()+f.slice(1)] || '';
+  });
+  items = c.items.map(it=>({...it}));
+  itemIdx = Math.max(...items.map(i=>i.id), 0);
+  renderItems();
+  switchTab('cotacao');
+}
+
+function previewCotacao(num) {
+  carregarCotacao(num);
+  switchTab('preview');
+}
+
+function apagarCotacao(num) {
+  if (!confirm('Apagar a cotação '+num+'?')) return;
+  let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]').filter(c=>c.num!==num);
+  localStorage.setItem('cotacoes', JSON.stringify(cots));
+  renderCotList();
+  if (temDB()) dbCall('deleteCotacao', { num });
+}
+
+/* ────────── BUILD DOCUMENT */
+function gerarPreview() {
+  document.getElementById('cot-preview').innerHTML = buildDoc();
+  const doc = document.querySelector('#cot-preview .cot-doc');
+  if (doc) doc.classList.add('preview-mode');
+}
+
+function buildDoc() {
+  const cor      = document.getElementById('cfg-cor').value || '#1a4fa0';
+  const empNome  = lsv('emp-nome')  || 'Empresa Emissora';
+  const empNuit  = lsv('emp-nuit');
+  const empEnd   = lsv('emp-end');
+  const empTel   = lsv('emp-tel');
+  const empEmail = lsv('emp-email');
+  const empCidade= lsv('emp-cidade');
+
+  const cliNome  = gv('cli-nome') || '—';
+  const cliNuit  = gv('cli-nuit');
+  const cliEnd   = gv('cli-end');
+  const cliCidade= gv('cli-cidade');
+  const cliTel   = gv('cli-tel');
+  const cliEmail = gv('cli-email');
+
+  const cotNum   = gv('cot-num');
+  const cotData  = fmtDate(gv('cot-data'));
+  const cotVenc  = fmtDate(gv('cot-venc'));
+  const cotCond  = gv('cot-cond') || 'Pronto Pagamento';
+  const cotTempo = gv('cot-tempo') || 'Entrega imediata';
+  const cotVal   = gv('cot-validade') || '15';
+  const moeda    = gv('cot-moeda') || 'MT';
+  const rodape   = lsv('cfg-rodape') || 'Documento Processado por Computador';
+
+  let sub=0, ivaTotal=0;
+  items.forEach(it=>{ const b=calcLiq(it); sub+=b; ivaTotal+=b*(it.iva/100); });
+  const total = sub + ivaTotal;
+
+  const logoHTML = logoData
+    ? `<img src="${logoData}" style="max-height:22mm;max-width:68mm;object-fit:contain;display:block">`
+    : `<div style="background:#f0f4ff;border-radius:4px;color:${cor};font-weight:700;font-size:13px;letter-spacing:1px;padding:10px 16px;display:inline-block">${esc(empNome)}</div>`;
+
+  const empInfo = [empEnd, empCidade, empTel?'Tel: '+empTel:'', empEmail, empNuit?'NUIT: '+empNuit:'']
+    .filter(Boolean).map(s=>`<div>${esc(s)}</div>`).join('');
+
+  const cliInfo = [cliEnd, cliCidade, cliTel?'Tel: '+cliTel:'', cliEmail, cliNuit?'NUIT: '+cliNuit:'']
+    .filter(Boolean).map(s=>`<div>${esc(s)}</div>`).join('');
+
+  const rows = items.map((it,i)=>`
+    <tr>
+      <td>${String(i+1).padStart(2,'0')}</td>
+      <td>${esc(it.ref)||'—'}</td>
+      <td>${esc(it.desc)||'—'}</td>
+      <td class="r">${fmt(it.qtd)}</td>
+      <td>${esc(it.un)}</td>
+      <td class="r">${fmt(it.pu)}</td>
+      <td class="r">${it.iva}%</td>
+      <td class="r"><strong>${fmt(calcLiq(it))}</strong></td>
+    </tr>`).join('');
+
+  const extensoHTML = valorPorExtenso(total, moeda);
+
+  return `
+<div class="cot-doc">
+<div class="cot-doc-body">
+
+  <!-- CABEÇALHO -->
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5mm;padding-bottom:4mm;border-bottom:2.5px solid ${cor}">
+    <div>${logoHTML}</div>
+    <div style="text-align:right">
+      <div style="font-size:24px;font-weight:700;color:${cor};letter-spacing:2px">COTAÇÃO</div>
+      <div style="font-size:14px;font-weight:700;color:${cor};margin-top:2px">Nº ${esc(cotNum)}</div>
+      <div style="font-size:10px;color:#555;margin-top:3px">${cotData}</div>
+      <div style="font-size:9px;background:${cor};color:#fff;padding:2px 9px;border-radius:3px;display:inline-block;margin-top:5px">Original</div>
+    </div>
+  </div>
+
+  <!-- EMPRESA / CLIENTE -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin-bottom:4mm">
+    <div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm">
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(empNome)}</div>
+      <div style="font-size:9.5px;color:#444;line-height:1.7">${empInfo}</div>
+    </div>
+    <div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm">
+      <div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(cliNome)}</div>
+      <div style="font-size:9.5px;color:#444;line-height:1.7">${cliInfo}</div>
+    </div>
+  </div>
+
+  <!-- META GRID -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #d0d5dd;border-radius:4px;overflow:hidden;margin-bottom:4mm;font-size:10px">
+    ${[['Nº Contrib.',empNuit||'—'],['Vencimento',cotVenc],['Validade',cotVal+' dias'],['Cond. Pagamento',cotCond],['Moeda',moeda]]
+      .map(([l,v],i)=>`<div style="padding:4px 7px${i<4?';border-right:1px solid #d0d5dd':''}">
+        <span style="font-size:7.5px;font-weight:700;color:${cor};text-transform:uppercase;display:block;margin-bottom:1px">${l}</span>
+        <span style="font-weight:600">${v}</span></div>`).join('')}
+  </div>
+
+  <!-- TABELA ITENS -->
+  <table style="margin-bottom:4mm">
+    <thead><tr>
+      <th style="width:26px">Nº</th>
+      <th style="width:75px">Ref.</th>
+      <th>Descrição</th>
+      <th class="r" style="width:50px">Qtd.</th>
+      <th style="width:28px">Un</th>
+      <th class="r" style="width:80px">Pr. Unit.</th>
+      <th class="r" style="width:40px">IVA</th>
+      <th class="r" style="width:86px">Total Liq.</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  <!-- TOTAIS -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:3mm">
+    <div style="width:72mm;border:1px solid #d0d5dd;border-radius:4px;overflow:hidden;font-size:11px">
+      <div style="display:flex;justify-content:space-between;padding:4px 9px"><span style="color:#555">Sub-Total</span><span>${fmt(sub)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 9px;background:#f9fbff"><span style="color:#555">Desconto Financeiro</span><span>0,00</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 9px"><span style="color:#555">IVA</span><span>${fmt(ivaTotal)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:6px 9px;background:${cor};color:#fff;font-weight:700;font-size:13px"><span>Total (${moeda})</span><span>${fmt(total)}</span></div>
+    </div>
+  </div>
+
+  <!-- VALOR POR EXTENSO -->
+  <div style="border:1px solid #c5d8f7;border-radius:4px;background:#f0f4ff;padding:4px 10px;font-size:10px;color:${cor};font-style:italic;margin-bottom:4mm;text-align:right">
+    <strong>Por extenso:</strong> ${extensoHTML}
+  </div>
+
+  <!-- CONDIÇÕES -->
+  <div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm;font-size:10px">
+    <div style="font-size:8px;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px">Condições</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+      <div><span style="color:#555">Tempo de execução: </span><span style="font-weight:600">${esc(cotTempo)}</span></div>
+      <div><span style="color:#555">Validade da cotação: </span><span style="font-weight:600">${cotVal} dias</span></div>
+      <div><span style="color:#555">Cond. de pagamento: </span><span style="font-weight:600">${esc(cotCond)}</span></div>
+    </div>
+  </div>
+
+</div><!-- fim cot-doc-body -->
+
+<!-- FOOTER: assinaturas + rodapé sempre na base -->
+<div class="cot-doc-footer">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16mm;margin-bottom:8mm">
+    <div>
+      <div style="border-top:1px solid #888;padding-top:5px;font-size:9.5px;color:#555;text-align:center">Assinatura e Carimbo do Emitente</div>
+    </div>
+    <div>
+      <div style="border-top:1px solid #888;padding-top:5px;font-size:9.5px;color:#555;text-align:center">Assinatura e Carimbo do Cliente</div>
+    </div>
+  </div>
+  <div style="border-top:1px solid #d0d5dd;padding-top:3mm;text-align:center;font-size:9px;color:#888">${esc(rodape)}</div>
+</div>
+
+</div>`;
+}
+
+/* ────────── VALOR POR EXTENSO (PT) */
+function valorPorExtenso(valor, moeda) {
+  const nomesMoeda = {
+    MT:  ['Metical','Meticais','Centavo','Centavos'],
+    USD: ['Dólar','Dólares','Cêntimo','Cêntimos'],
+    EUR: ['Euro','Euros','Cêntimo','Cêntimos'],
+    ZAR: ['Rand','Rands','Cêntimo','Cêntimos'],
+  };
+  const nm = nomesMoeda[moeda] || ['Unidade','Unidades','Centavo','Centavos'];
+  const inteiro = Math.floor(valor);
+  const cents   = Math.round((valor - inteiro) * 100);
+
+  const ext = numExtenso(inteiro);
+  const moedaNome = inteiro===1 ? nm[0] : nm[1];
+  let res = ext + ' ' + moedaNome;
+  if (cents > 0) {
+    const extC = numExtenso(cents);
+    const centNome = cents===1 ? nm[2] : nm[3];
+    res += ' e ' + extC + ' ' + centNome;
+  }
+  return res.charAt(0).toUpperCase() + res.slice(1);
+}
+
+function numExtenso(n) {
+  if (n===0) return 'zero';
+  const un  = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove',
+                'dez','onze','doze','treze','catorze','quinze','dezasseis','dezassete','dezoito','dezanove'];
+  const dez = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  const cen = ['','cem','duzentos','trezentos','quatrocentos','quinhentos',
+                'seiscentos','setecentos','oitocentos','novecentos'];
+  if (n < 20)  return un[n];
+  if (n < 100) return dez[Math.floor(n/10)] + (n%10 ? ' e '+un[n%10] : '');
+  if (n === 100) return 'cem';
+  if (n < 1000) {
+    const c = Math.floor(n/100), r = n%100;
+    return cen[c] + (r ? ' e '+numExtenso(r) : '');
+  }
+  if (n < 1000000) {
+    const m = Math.floor(n/1000), r = n%1000;
+    const prefix = m===1 ? 'mil' : numExtenso(m)+' mil';
+    return prefix + (r ? (r<100 ? ' e '+numExtenso(r) : ' '+numExtenso(r)) : '');
+  }
+  if (n < 1000000000) {
+    const m = Math.floor(n/1000000), r = n%1000000;
+    const prefix = m===1 ? 'um milhão' : numExtenso(m)+' milhões';
+    return prefix + (r ? ' e '+numExtenso(r) : '');
+  }
+  const m = Math.floor(n/1000000000), r = n%1000000000;
+  const prefix = m===1 ? 'um bilião' : numExtenso(m)+' biliões';
+  return prefix + (r ? ' e '+numExtenso(r) : '');
+}
+
+/* ────────── PDF EXPORT (vetorial — usa o motor de impressão do browser
+   numa janela dedicada, garantindo texto vetorial nítido e 100% idêntico
+   à pré-visualização, sem rasterizar nada) */
+function exportarPDF() {
+  gerarPreview();
+  const docHTML = buildDoc();
+  const num = (gv('cot-num') || 'cotacao').replace(/[\/\\?%*:|"<>]/g, '-');
+  const cliente = (gv('cli-nome') || 'Cliente').trim()
+    .replace(/[\/\\?%*:|"<>]/g, '-')
+    .replace(/\s+/g, '_');
+  const nomeFicheiro = `Cotacao_${cliente}_${num}`;
+
+  // CSS necessário para o documento (extraído das regras .cot-doc do ficheiro)
+  const docCSS = `
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif}
+    .cot-doc{
+      background:#fff;width:210mm;min-height:297mm;
+      margin:0 auto;padding:11mm 14mm;
+      font-family:Arial,Helvetica,sans-serif;font-size:11.5px;
+      color:#1a1a1a;box-shadow:none;
+      display:flex;flex-direction:column;
+    }
+    .cot-doc-body{flex:1;display:flex;flex-direction:column}
+    .cot-doc-footer{margin-top:auto;padding-top:6mm}
+    .cot-doc table{width:100%;border-collapse:collapse}
+    .cot-doc th{background:#1a4fa0;color:#fff;padding:5px 7px;font-size:10px;font-weight:700;text-align:left;text-transform:uppercase;letter-spacing:.4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .cot-doc th.r,.cot-doc td.r{text-align:right}
+    .cot-doc td{padding:5px 7px;border-bottom:1px solid #eee;font-size:11px;vertical-align:middle}
+    .cot-doc tr:nth-child(even) td{background:#f9fbff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    @page{size:A4;margin:0}
+    @media print{
+      html,body{width:210mm}
+      .cot-doc{box-shadow:none!important;page-break-inside:avoid}
+      .cot-doc-footer{page-break-inside:avoid}
+    }
+  `;
+
+  const win = window.open('', '_blank', 'width=900,height:1100');
+  if (!win) {
+    showToast('⚠️ O browser bloqueou a janela de impressão. Permita pop-ups para este site e tente novamente.');
+    return;
+  }
+  win.document.open();
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>${nomeFicheiro}</title>
+    <style>${docCSS}</style>
+    </head><body>${docHTML}</body></html>`);
+  win.document.close();
+
+  // espera imagens (logo) e layout estarem prontos antes de imprimir
+  const triggerPrint = () => {
+    win.focus();
+    win.print();
+  };
+  win.onload = () => setTimeout(triggerPrint, 250);
+  // fallback caso onload não dispare (alguns browsers com document.write)
+  setTimeout(() => { if (!win.closed) triggerPrint(); }, 600);
+
+  showToast('🖨️ Use "Guardar como PDF" na janela de impressão para obter o ficheiro.');
+}
+
+/* ────────── LIMPAR */
+function limparForm() {
+  if (!confirm('Limpar todos os dados para nova cotação?')) return;
+  items=[]; itemIdx=0;
+  ['cli-nome','cli-nuit','cli-end','cli-cidade','cli-tel','cli-email'].forEach(f=>{
+    const el=document.getElementById(f); if(el) el.value='';
+  });
+  document.getElementById('cot-cond').value='Pronto Pagamento';
+  document.getElementById('cot-tempo').value='Entrega imediata';
+  document.getElementById('cot-validade').value='15';
+  setDefaultDates(); autoNum(); addItem();
+}
+
+/* ────────── MODAL */
+function fecharModal() {
+  document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('open'));
+}
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal-bg')) fecharModal();
+});
+
+/* ────────── UTILS */
+function gv(id)  { return (document.getElementById(id)||{}).value||''; }
+function lsv(k)  { return localStorage.getItem(k)||''; }
+function esc(s)  { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmt(n)  { return Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,'.').replace(/\.(\d+)$/,',$1'); }
+function fmtDate(s){ if(!s) return '—'; const [y,m,d]=s.split('-'); return `${d}-${m}-${y}`; }
+
+function showToast(msg) {
+  let t=document.getElementById('toast');
+  if (!t) {
+    t=document.createElement('div'); t.id='toast';
+    t.style.cssText='position:fixed;bottom:24px;right:24px;background:#1a1a2e;color:#fff;padding:11px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:99999;opacity:0;transition:opacity .25s;pointer-events:none;max-width:320px';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg; t.style.opacity='1';
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>{ t.style.opacity='0'; }, 3000);
+}
+
+/* ────────── START */
+renderItems();
+</script>
+</body>
+</html>
