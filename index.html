@@ -265,7 +265,7 @@ textarea{resize:vertical;min-height:58px}
     <div class="form-grid">
       <div class="field s2">
         <label>URL da Base de Dados (Google Apps Script — Web App)</label>
-        <input type="text" id="cfg-db-url" placeholder="https://script.google.com/macros/s/SEU_ID_AQUI/exec" value="https://script.google.com/macros/s/AKfycbwKXlhfQThj22L48rkNXRq29ItBumD5FORG-Aw-1dcFNqbdiOunKiDeN6jPk8K8CS5Y/exec">
+        <input type="text" id="cfg-db-url" placeholder="https://script.google.com/macros/s/SEU_ID_AQUI/exec" value="https://script.google.com/macros/s/AKfycbw8MxMfs-phf8qq2OvO9zcc2Zw3fs9l9v92oqK5vsc37IcK5GooUcruSXJRlq9gcxuB/exec">
       </div>
     </div>
     <div class="btn-bar" style="margin-top:10px">
@@ -408,7 +408,7 @@ let _itemParaSel = null; // id do item que pediu selecção de produto
 
 // URL padrão de fábrica da Base de Dados (Google Apps Script). Pode ser
 // substituído a qualquer momento no separador Configurações.
-const DB_URL_PADRAO = 'https://script.google.com/macros/s/AKfycbwKXlhfQThj22L48rkNXRq29ItBumD5FORG-Aw-1dcFNqbdiOunKiDeN6jPk8K8CS5Y/exec';
+const DB_URL_PADRAO = 'https://script.google.com/macros/s/AKfycbw8MxMfs-phf8qq2OvO9zcc2Zw3fs9l9v92oqK5vsc37IcK5GooUcruSXJRlq9gcxuB/exec';
 
 function getDbUrl() {
   const guardado = (localStorage.getItem('cfg-db-url') || '').trim();
@@ -420,12 +420,14 @@ async function dbCall(action, payload) {
   const url = getDbUrl();
   if (!url) return null;
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight CORS
-      body: JSON.stringify({ action, ...payload })
-    });
+    // GET com parâmetros na query string: evita os problemas de CORS/redirect
+    // que o Apps Script costuma ter com POST + body JSON vindo de outra origem.
+    const qs = new URLSearchParams();
+    qs.set('action', action);
+    qs.set('payload', JSON.stringify(payload || {}));
+    const fullUrl = url + (url.includes('?') ? '&' : '?') + qs.toString();
+
+    const res = await fetch(fullUrl, { method: 'GET', redirect: 'follow' });
     if (!res.ok) {
       throw new Error('HTTP ' + res.status + ' ' + res.statusText);
     }
