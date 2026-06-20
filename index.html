@@ -310,7 +310,7 @@ body.locked{overflow:hidden}
     <div class="form-grid">
       <div class="field s2">
         <label>URL da Base de Dados (Google Apps Script — Web App)</label>
-        <input type="text" id="cfg-db-url" placeholder="https://script.google.com/macros/s/SEU_ID_AQUI/exec" value="https://script.google.com/macros/s/AKfycby-dAx0p7mVD4JIyXGJiq0K04SjzHiHBcsOtBmT-DHSUVqPpvgjmL1XS93v0xZU5x4c/exec">
+        <input type="text" id="cfg-db-url" placeholder="https://script.google.com/macros/s/SEU_ID_AQUI/exec" value="">
       </div>
     </div>
     <div class="btn-bar" style="margin-top:10px">
@@ -514,9 +514,10 @@ let _itemParaSel = null; // id do item que pediu selecção de produto
    também enviada para a Google Sheet em segundo plano.
    ════════════════════════════════════════════════════════════════ */
 
-// URL padrão de fábrica da Base de Dados (Google Apps Script). Pode ser
-// substituído a qualquer momento no separador Configurações.
-const DB_URL_PADRAO = 'https://script.google.com/macros/s/AKfycby-dAx0p7mVD4JIyXGJiq0K04SjzHiHBcsOtBmT-DHSUVqPpvgjmL1XS93v0xZU5x4c/exec';
+// URL padrão de fábrica da Base de Dados (Google Apps Script). Cole aqui o
+// URL da SUA implementação para ficar pré-configurado de fábrica, ou deixe
+// vazio e cole no campo do separador Configurações.
+const DB_URL_PADRAO = '';
 
 function getDbUrl() {
   const guardado = (localStorage.getItem('cfg-db-url') || '').trim();
@@ -529,41 +530,28 @@ async function dbCall(action, payload) {
   if (!url) return null;
   console.log('[DEBUG] dbCall acção=' + action, 'payload=', payload);
 
-  // Acções que ESCREVEM dados vão sempre por POST: mais fiável e sem
-  // limite de tamanho de URL. Acções de LEITURA simples vão por GET,
-  // que tem melhor compatibilidade de CORS com o Apps Script.
-  const acoesEscrita = ['saveConfig','saveCliente','deleteCliente','saveProduto','deleteProduto','saveCotacao','deleteCotacao'];
-  const usarPost = acoesEscrita.includes(action);
-
   try {
-    let res;
-    if (usarPost) {
-      res = await fetch(url, {
-        method: 'POST',
-        redirect: 'follow',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight CORS
-        body: JSON.stringify({ action, ...payload })
-      });
-    } else {
-      // GET com parâmetros na query string: evita os problemas de CORS/redirect
-      // que o Apps Script costuma ter com POST + body JSON vindo de outra origem.
-      const qs = new URLSearchParams();
-      qs.set('action', action);
-      qs.set('payload', JSON.stringify(payload || {}));
-      const fullUrl = url + (url.includes('?') ? '&' : '?') + qs.toString();
-      res = await fetch(fullUrl, { method: 'GET', redirect: 'follow' });
-    }
+    const res = await fetch(url, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight CORS
+      body: JSON.stringify({ action, ...payload })
+    });
 
     if (!res.ok) {
       throw new Error('HTTP ' + res.status + ' ' + res.statusText);
     }
     const texto = await res.text();
+    let json;
     try {
-      return JSON.parse(texto);
+      json = JSON.parse(texto);
     } catch (parseErr) {
-      // a resposta não é JSON — normalmente é uma página de login/erro do Google
       throw new Error('Resposta inesperada do servidor (não é JSON). Verifique se a implementação está activa e com acesso "Qualquer pessoa".');
     }
+    if (json && json.ok === false) {
+      console.warn('[DEBUG] Base de Dados respondeu com erro em "' + action + '":', json.error);
+    }
+    return json;
   } catch (err) {
     console.error('Erro de ligação à Base de Dados (' + action + '):', err);
     setDbStatus(false, '❌ ' + (err.message || 'Falha de ligação') + ' — a trabalhar apenas localmente.');
