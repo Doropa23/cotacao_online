@@ -177,7 +177,7 @@ body.locked{overflow:hidden}
 
 <!-- TABS -->
 <div class="tabs no-print">
-  <div class="tab active" onclick="switchTab('cotacao')">📄 Nova Cotação</div>
+  <div class="tab active" onclick="irParaNovaCotacao()">📄 Nova Cotação</div>
   <div class="tab" onclick="switchTab('guardadas')">🗂️ Cotações Guardadas</div>
   <div class="tab" onclick="switchTab('produtos')">📦 Produtos</div>
   <div class="tab" onclick="switchTab('preview')">👁️ Pré-visualizar</div>
@@ -1480,8 +1480,7 @@ function exportarPDF() {
 }
 
 /* ────────── LIMPAR */
-function limparForm() {
-  if (!confirm('Limpar todos os dados para nova cotação?')) return;
+function limparFormSilencioso() {
   items=[]; itemIdx=0;
   ['cli-nome','cli-nuit','cli-end','cli-cidade','cli-tel','cli-email'].forEach(f=>{
     const el=document.getElementById(f); if(el) el.value='';
@@ -1492,6 +1491,20 @@ function limparForm() {
   document.getElementById('cot-desc-tipo').value='pct';
   document.getElementById('cot-desc-valor').value='0';
   setDefaultDates(); autoNum(); addItem();
+}
+
+function limparForm() {
+  if (!confirm('Limpar todos os dados para nova cotação?')) return;
+  limparFormSilencioso();
+}
+
+// Usado pelo separador "📄 Nova Cotação" no topo: garante sempre um
+// formulário limpo e com a data de hoje, mesmo que estivesse antes a
+// editar outra cotação — evita o separador "Nova Cotação" mostrar por
+// engano dados (incluindo data) de uma cotação anterior já carregada.
+function irParaNovaCotacao() {
+  limparFormSilencioso();
+  switchTab('cotacao');
 }
 
 /* ────────── MODAL */
