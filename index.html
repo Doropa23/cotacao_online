@@ -915,11 +915,35 @@ function loadLogo(file) {
     const r = new FileReader();
     r.onload = e => {
       const svgText = e.target.result;
-      // guarda como Data URI de SVG (texto), mantendo-se 100% vetorial
-      const svgDataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+
+      // valida que o ficheiro é mesmo um SVG bem formado antes de o usar
+      if (!svgText || !/<svg[\s>]/i.test(svgText)) {
+        showToast('❌ Ficheiro SVG inválido ou corrompido. Tente novamente com outro ficheiro.');
+        return;
+      }
+
+      let svgDataUri;
+      try {
+        svgDataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+      } catch (err) {
+        showToast('❌ Não foi possível processar este SVG (caracteres inválidos). Tente exportar novamente do programa de origem.');
+        console.error('Erro ao codificar SVG:', err);
+        return;
+      }
+
       logoData = svgDataUri;
       showLogoPreview(svgDataUri);
-      localStorage.setItem('logoData', svgDataUri);
+
+      try {
+        localStorage.setItem('logoData', svgDataUri);
+      } catch (err) {
+        // localStorage cheio (quota excedida) — o logo continua a funcionar
+        // nesta sessão (em memória), mas avisa que não vai persistir.
+        console.error('Erro ao guardar logo no localStorage:', err);
+        showToast('⚠️ Logotipo aplicado nesta sessão, mas não foi possível guardar (armazenamento do navegador cheio). Tente limpar dados antigos ou usar um SVG mais simples.');
+        return;
+      }
+
       if (svgDataUri.length > 48000) {
         showToast('⚠️ Ficheiro SVG grande demais para sincronizar com a Base de Dados (mas continua a funcionar neste navegador). Tente simplificar o SVG (menos detalhes/pontos) se quiser sincronizar.');
       } else if (temDB()) {
@@ -929,6 +953,9 @@ function loadLogo(file) {
       } else {
         showToast('✅ Logotipo SVG (vetorial) carregado!');
       }
+    };
+    r.onerror = () => {
+      showToast('❌ Erro ao ler o ficheiro SVG. Tente novamente.');
     };
     r.readAsText(file);
     return;
@@ -983,8 +1010,15 @@ function loadLogo(file) {
 
 function showLogoPreview(src) {
   const img = document.getElementById('logo-preview');
-  img.src=src; img.style.display='block';
-  document.getElementById('logo-text').textContent='Clique para substituir';
+  img.onerror = () => {
+    console.error('Falha ao renderizar o logotipo — dados de imagem inválidos/corrompidos.');
+    showToast('⚠️ O logotipo guardado parece estar corrompido. Por favor carregue-o novamente.');
+    img.style.display = 'none';
+    document.getElementById('logo-text').textContent = 'Erro ao carregar — clique para tentar novamente';
+  };
+  img.src = src;
+  img.style.display = 'block';
+  document.getElementById('logo-text').textContent = 'Clique para substituir';
 }
 function removerLogo() {
   logoData=''; localStorage.removeItem('logoData');
