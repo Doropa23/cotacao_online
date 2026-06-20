@@ -527,13 +527,16 @@ function temDB() { return !!getDbUrl(); }
 async function dbCall(action, payload) {
   const url = getDbUrl();
   if (!url) return null;
-  try {
-    const payloadStr = JSON.stringify(payload || {});
-    let res;
 
-    if (payloadStr.length > 6000) {
-      // payload grande (ex: logotipo em base64) — não cabe numa URL GET,
-      // por isso usa-se POST com o corpo em texto simples.
+  // Acções que ESCREVEM dados vão sempre por POST: mais fiável e sem
+  // limite de tamanho de URL. Acções de LEITURA simples vão por GET,
+  // que tem melhor compatibilidade de CORS com o Apps Script.
+  const acoesEscrita = ['saveConfig','saveCliente','deleteCliente','saveProduto','deleteProduto','saveCotacao','deleteCotacao'];
+  const usarPost = acoesEscrita.includes(action);
+
+  try {
+    let res;
+    if (usarPost) {
       res = await fetch(url, {
         method: 'POST',
         redirect: 'follow',
@@ -545,7 +548,7 @@ async function dbCall(action, payload) {
       // que o Apps Script costuma ter com POST + body JSON vindo de outra origem.
       const qs = new URLSearchParams();
       qs.set('action', action);
-      qs.set('payload', payloadStr);
+      qs.set('payload', JSON.stringify(payload || {}));
       const fullUrl = url + (url.includes('?') ? '&' : '?') + qs.toString();
       res = await fetch(fullUrl, { method: 'GET', redirect: 'follow' });
     }
@@ -561,7 +564,7 @@ async function dbCall(action, payload) {
       throw new Error('Resposta inesperada do servidor (não é JSON). Verifique se a implementação está activa e com acesso "Qualquer pessoa".');
     }
   } catch (err) {
-    console.error('Erro de ligação à Base de Dados:', err);
+    console.error('Erro de ligação à Base de Dados (' + action + '):', err);
     setDbStatus(false, '❌ ' + (err.message || 'Falha de ligação') + ' — a trabalhar apenas localmente.');
     return null;
   }
