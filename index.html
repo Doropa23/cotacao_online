@@ -151,6 +151,11 @@ textarea{resize:vertical;min-height:58px}
 .doc-card.anulado{opacity:.55}
 .doc-card.anulado .cot-card-total{text-decoration:line-through}
 [hidden]{display:none!important}
+#offline-banner{background:#b45309;color:#fff;text-align:center;padding:6px 12px;font-size:12px;font-weight:600;position:sticky;top:0;z-index:900}
+#offline-bloqueio{position:fixed;inset:0;background:rgba(15,20,40,.96);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px}
+#offline-bloqueio .box{background:#fff;border-radius:12px;max-width:460px;padding:26px 28px;text-align:center}
+#offline-bloqueio h2{font-size:18px;margin-bottom:10px;color:#b3261e}
+#offline-bloqueio p{font-size:13px;line-height:1.6;color:#333;margin-bottom:10px}
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .kpi{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;box-shadow:var(--shadow)}
 .kpi .k-l{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
@@ -189,6 +194,17 @@ body.locked{overflow:hidden}
 </style>
 </head>
 <body class="locked">
+
+<div id="offline-banner" hidden></div>
+<div id="offline-bloqueio" hidden>
+  <div class="box">
+    <h2 id="ob-titulo">⛔ Aplicação bloqueada</h2>
+    <p id="ob-msg"></p>
+    <p style="font-size:12px;color:#666">Os seus dados continuam guardados neste dispositivo. Ligue-se à internet e carregue no botão para sincronizar e continuar.</p>
+    <button class="btn btn-primary" id="ob-btn" onclick="tentarReligar()">🔄 Tentar ligar agora</button>
+    <div id="ob-estado" style="font-size:12px;margin-top:10px;color:#666"></div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════ ECRÃ DE LOGIN -->
 <div id="login-screen">
@@ -641,6 +657,21 @@ body.locked{overflow:hidden}
   </div>
 </div>
 
+<!-- ══════════════════════════════════ MODAL: AVISO OFFLINE -->
+<div class="modal-bg" id="modal-offline">
+  <div class="modal">
+    <h3>📴 Está a trabalhar offline</h3>
+    <div class="alert alert-info" style="font-size:13px;line-height:1.7">
+      <strong>Atenção:</strong> offline, a aplicação só pode ser usada em <strong>um único computador e um único navegador</strong>.
+      Não crie cotações ou documentos noutro dispositivo/navegador até voltar a ligar e sincronizar.<br><br>
+      • Tudo o que criar fica guardado <strong>neste dispositivo</strong> e é enviado para a Base de Dados quando a ligação voltar.<br>
+      • A numeração continua a partir da última cotação feita online; ao voltar online é confrontada com a Base de Dados.<br>
+      • Depois de <strong>8 horas sem ligação</strong>, a aplicação deixa de funcionar até voltar a ligar e sincronizar.
+    </div>
+    <div class="btn-bar"><button class="btn btn-primary" onclick="fecharModal()">Entendi</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modal-pin">
   <div class="modal">
     <h3>🔒 Acesso Restrito</h3>
@@ -762,6 +793,8 @@ function entrarNoSistema() {
   document.body.classList.remove('locked');
   document.getElementById('login-erro').style.display = 'none';
   aplicarPermissoes();
+  atualizarBannerOffline();
+  if (!_online) avisarOffline();
   if (typeof ligarComRetry === 'function' && temDB()) ligarComRetry();
 }
 
@@ -789,6 +822,7 @@ async function confirmarLogin() {
     }
     if (r && r.ok === false && !/Acção desconhecida/.test(r.error || '')) { mostrarErroLogin(r.error || 'Não foi possível iniciar sessão.'); return; }
     // Script antigo ou sem ligação: acesso offline (quem já entrou aqui) ou credenciais de 1.º acesso
+    if (verificarLimiteOffline()) return;   // mais de 8 h sem ligação: bloqueado
     const off = verificarOffline(user, pass);
     if (off) { SESSAO = Object.assign({ token: '' }, off); entrarNoSistema(); showToast('📴 Modo offline — sem ligação à Base de Dados.'); return; }
     if (!localStorage.getItem('authAtivo') && user === LOGIN_USER && pass === LOGIN_PASS) {
@@ -901,7 +935,7 @@ function getDbUrl() {
 }
 function temDB() { return !!getDbUrl(); }
 
-async function dbCall(action, payload) {
+async function dbCallRaw(action, payload) {
   const url = getDbUrl();
   if (!url) return null;
   console.log('[DEBUG] dbCall acção=' + action, 'payload=', payload);
@@ -924,6 +958,7 @@ async function dbCall(action, payload) {
     } catch (parseErr) {
       throw new Error('Resposta inesperada do servidor (não é JSON). Verifique se a implementação está activa e com acesso "Qualquer pessoa".');
     }
+    marcarOnline();   // o servidor respondeu: há ligação
     if (json && json.ok === false) {
       console.warn('[DEBUG] Base de Dados respondeu com erro em "' + action + '":', json.error);
       if (json.code === 'AUTH') sessaoExpirada(json.error);
@@ -933,8 +968,217 @@ async function dbCall(action, payload) {
   } catch (err) {
     console.error('Erro de ligação à Base de Dados (' + action + '):', err);
     setDbStatus(false, '❌ ' + (err.message || 'Falha de ligação') + ' — a trabalhar apenas localmente.');
+    marcarOffline();
     return null;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   OFFLINE SEGURO: fila de envio, conflitos de numeração, limite de 8h
+   ────────────────────────────────────────────────────────────────
+   • Tudo é guardado primeiro neste dispositivo.
+   • O que não conseguir ir para a Base de Dados fica numa FILA e é
+     enviado quando a ligação voltar (antes de ler o que está online).
+   • Se o número já existir online noutra cotação/documento, o do
+     modo offline é renumerado a seguir ao último número online.
+   • Sem ligação há mais de 8 horas → a aplicação bloqueia.
+   ════════════════════════════════════════════════════════════════ */
+const LIMITE_OFFLINE_MS = 8 * 3600 * 1000;
+const ESCRITAS = { saveCliente:1, deleteCliente:1, saveProduto:1, deleteProduto:1, saveCotacao:1, deleteCotacao:1, saveDocumento:1, saveConfig:1 };
+let _online = true, _avisoOfflineMostrado = false, _flushEmCurso = false;
+
+function getFila() { try { return JSON.parse(localStorage.getItem('outbox') || '[]'); } catch (e) { return []; } }
+function setFila(f) { localStorage.setItem('outbox', JSON.stringify(f)); }
+function chaveFila(action, p) {
+  if (action === 'saveCotacao')   return 'cot:' + p.cotacao.num;
+  if (action === 'deleteCotacao') return 'cot:' + p.num;
+  if (action === 'saveDocumento') return 'doc:' + p.documento.id;
+  if (action === 'saveCliente')   return 'cli:' + p.cliente.id;
+  if (action === 'deleteCliente') return 'cli:' + p.id;
+  if (action === 'saveProduto')   return 'prod:' + p.produto.id;
+  if (action === 'deleteProduto') return 'prod:' + p.id;
+  return 'cfg';
+}
+function enfileirar(action, payload) {
+  let f = getFila();
+  const k = chaveFila(action, payload);
+  if (k === 'cfg') {
+    const antigo = f.find(x => x.k === 'cfg');
+    payload = { config: Object.assign({}, antigo ? antigo.payload.config : {}, payload.config || {}) };
+  }
+  f = f.filter(x => x.k !== k);
+  f.push({ k, action, payload: JSON.parse(JSON.stringify(payload)), ts: Date.now() + Math.random(), por: SESSAO ? SESSAO.username : '' });
+  setFila(f);
+  atualizarBannerOffline();
+}
+
+// Escrita com fila: se não houver ligação, fica guardado para enviar depois.
+async function dbCall(action, payload) {
+  const r = await dbCallRaw(action, payload);
+  if (r === null && ESCRITAS[action] && temDB()) enfileirar(action, payload || {});
+  return r;
+}
+
+/* ────────── Estado de ligação e limite de 8 horas */
+function marcarOnline() {
+  const estavaOffline = !_online;
+  _online = true;
+  localStorage.setItem('ultimoOnline', String(Date.now()));
+  localStorage.setItem('relogioMax', String(Date.now()));
+  _avisoOfflineMostrado = false;
+  document.getElementById('offline-bloqueio').hidden = true;
+  atualizarBannerOffline();
+  if (estavaOffline && SESSAO) setTimeout(() => { if (!_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); } }, 300);
+}
+function marcarOffline() {
+  if (!temDB()) return;
+  _online = false;
+  if (!localStorage.getItem('ultimoOnline')) localStorage.setItem('ultimoOnline', String(Date.now()));
+  atualizarBannerOffline();
+  if (!verificarLimiteOffline()) avisarOffline();
+}
+function offlineMs() { return Date.now() - (+localStorage.getItem('ultimoOnline') || Date.now()); }
+function formatarRestante(ms) { const m = Math.max(0, Math.floor(ms / 60000)); return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'min'; }
+
+function atualizarBannerOffline() {
+  const b = document.getElementById('offline-banner');
+  if (!b) return;
+  if (_online || !SESSAO) { b.hidden = true; return; }
+  const pend = getFila().length;
+  b.hidden = false;
+  b.textContent = `📴 Modo offline — dados guardados só neste dispositivo (use um único computador/navegador). Restam ${formatarRestante(LIMITE_OFFLINE_MS - offlineMs())} antes do bloqueio.` + (pend ? ` · ${pend} alteração(ões) por enviar.` : '');
+}
+
+function avisarOffline() {
+  if (_online || !SESSAO || _avisoOfflineMostrado) return;
+  _avisoOfflineMostrado = true;
+  document.getElementById('modal-offline').classList.add('open');
+}
+
+// Devolve true se a aplicação ficou bloqueada
+function verificarLimiteOffline() {
+  if (!temDB() || _online) return false;
+  const agora = Date.now(), maxRel = +localStorage.getItem('relogioMax') || 0;
+  let motivo = '';
+  if (agora < maxRel - 120000) motivo = 'O relógio do computador foi alterado para trás. Por segurança, a aplicação está bloqueada até voltar a ligar.';
+  else if (offlineMs() > LIMITE_OFFLINE_MS) motivo = 'Passaram mais de 8 horas sem ligação à Base de Dados. A aplicação só volta a funcionar depois de ligar à internet e sincronizar.';
+  if (!motivo) { localStorage.setItem('relogioMax', String(Math.max(maxRel, agora))); return false; }
+  document.getElementById('ob-msg').textContent = motivo;
+  document.getElementById('offline-bloqueio').hidden = false;
+  return true;
+}
+
+async function tentarReligar() {
+  const btn = document.getElementById('ob-btn'), est = document.getElementById('ob-estado');
+  btn.disabled = true; est.textContent = 'A tentar ligar...';
+  const r = await dbCallRaw('status', {});
+  btn.disabled = false;
+  if (r) { est.textContent = ''; showToast('🌐 Ligação restabelecida.'); } else { est.textContent = 'Ainda sem ligação. Verifique a internet e tente novamente.'; }
+}
+
+function iniciarVigilanciaOffline() {
+  if (!localStorage.getItem('ultimoOnline')) localStorage.setItem('ultimoOnline', String(Date.now()));
+  window.addEventListener('offline', () => { if (temDB()) marcarOffline(); });
+  // Verifica o limite e tenta religar de 30 em 30 segundos enquanto estiver offline
+  setInterval(async () => {
+    if (!_online) {
+      atualizarBannerOffline();
+      if (verificarLimiteOffline()) return;
+      if (navigator.onLine !== false) await dbCallRaw('status', {});
+    }
+  }, 30000);
+  // Primeira verificação ao abrir (detecta se já abriu sem ligação)
+  if (temDB()) {
+    if (navigator.onLine === false) marcarOffline();
+    dbCallRaw('status', {});
+  }
+}
+
+/* ────────── Envio da fila + resolução de conflitos de numeração */
+function renumerar(num, seq) {
+  const m = String(num).match(/^(.*?)(\d+)\/(.*)$/);
+  return m ? m[1] + String(seq).padStart(Math.max(4, m[2].length), '0') + '/' + m[3] : num;
+}
+
+function resolverConflitoFila(it, r) {
+  if (it.action === 'saveCotacao') {
+    const c = it.payload.cotacao, antigo = c.num;
+    let seq = Math.max(seqMaximo(), +r.maxSeq || 0);
+    let novo; do { seq++; novo = renumerar(antigo, seq); } while (novo === antigo);
+    const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]');
+    const lc = cots.find(x => x.num === antigo && x.uid === c.uid);
+    if (lc) { lc.num = novo; localStorage.setItem('cotacoes', JSON.stringify(cots)); }
+    c.num = novo;
+    const f = getFila();
+    f.forEach(x => {
+      if (x.ts === it.ts) { x.k = 'cot:' + novo; x.payload.cotacao.num = novo; }
+      if (x.action === 'saveDocumento' && x.payload.documento.origem === antigo) x.payload.documento.origem = novo;
+    });
+    setFila(f);
+    const docs = getDocs(); let mudou = false;
+    docs.forEach(d => { if (d.origem === antigo && f.some(x => x.k === 'doc:' + d.id)) { d.origem = novo; mudou = true; } });
+    if (mudou) setDocs(docs);
+    registarSeq(seq);
+    if (gv('cot-num') === antigo) document.getElementById('cot-num').value = novo;
+    avisarRenumeracao(`Cotação ${antigo} → ${novo}`);
+    return true;
+  }
+  if (it.action === 'saveDocumento') {
+    const d = it.payload.documento, antigoId = d.id, antigoNum = d.num;
+    const T = TIPOS_DOC[d.tipo];
+    let seq = Math.max(seqMaximoDoc(d.tipo), +r.maxSeq || 0);
+    let novo; do { seq++; novo = renumerar(antigoNum, seq); } while (novo === antigoNum);
+    const novoId = docId(d.tipo, novo);
+    const docs = getDocs();
+    const ld = docs.find(x => x.id === antigoId && x.uid === d.uid);
+    if (ld) { ld.num = novo; ld.id = novoId; }
+    // recibos criados offline contra esta factura
+    docs.forEach(x => { if (x.tipo === 'RC' && x.facturaId === antigoId) { x.facturaId = novoId; x.origem = novo; } });
+    setDocs(docs);
+    d.num = novo; d.id = novoId;
+    const f = getFila();
+    f.forEach(x => {
+      if (x.ts === it.ts) x.k = 'doc:' + novoId;
+      if (x.action === 'saveDocumento' && x.payload.documento.tipo === 'RC' && x.payload.documento.facturaId === antigoId) {
+        x.payload.documento.facturaId = novoId; x.payload.documento.origem = novo;
+      }
+    });
+    setFila(f);
+    registarSeqDoc(d.tipo, seq);
+    avisarRenumeracao(`${T.nome} ${antigoNum} → ${novo}`);
+    return true;
+  }
+  return false;
+}
+function avisarRenumeracao(txt) {
+  const h = JSON.parse(localStorage.getItem('renumeracoes') || '[]');
+  h.unshift({ quando: new Date().toISOString(), txt }); localStorage.setItem('renumeracoes', JSON.stringify(h.slice(0, 30)));
+  showToast('🔢 Numeração ajustada (já existia online): ' + txt);
+  alert('Numeração ajustada ao voltar online\n\n' + txt + '\n\nO número original já tinha sido usado noutro documento na Base de Dados. Se já o imprimiu ou enviou, reimprima o documento com o novo número.');
+}
+
+// Envia, por ordem, o que ficou guardado offline. Devolve true se a fila ficou vazia.
+async function esvaziarFila() {
+  if (_flushEmCurso) return false;
+  _flushEmCurso = true;
+  try {
+    for (let guarda = 0; guarda < 1000; guarda++) {
+      const f = getFila();
+      if (!f.length) return true;
+      const it = f[0];
+      const r = await dbCallRaw(it.action, it.payload);
+      if (r === null) return false;                                  // sem ligação
+      if (r.ok === false && r.code === 'AUTH') return false;         // precisa de novo login; a fila mantém-se
+      if (r.ok === false && r.code === 'CONFLICT') { if (resolverConflitoFila(it, r)) continue; }
+      if (r.ok === false && r.code !== 'CONFLICT') {
+        const erros = JSON.parse(localStorage.getItem('filaErros') || '[]');
+        erros.unshift({ quando: new Date().toISOString(), acao: it.action, erro: r.error }); localStorage.setItem('filaErros', JSON.stringify(erros.slice(0, 20)));
+        console.warn('[FILA] item descartado:', it.action, r.error);
+      }
+      setFila(getFila().filter(x => !(x.k === it.k && x.ts === it.ts)));
+    }
+    return false;
+  } finally { _flushEmCurso = false; atualizarBannerOffline(); }
 }
 
 function setDbStatus(online, msg) {
@@ -987,8 +1231,23 @@ async function ligarBaseDados() {
 /* Puxa tudo da Sheet e actualiza o cache local (usado ao ligar e a pedido) */
 async function sincronizarTudo() {
   if (!temDB() || !SESSAO) return;
-  const r = await dbCall('getAll', {});
+  // 1) Primeiro envia o que ficou guardado offline (e resolve conflitos de numeração)
+  const filaOk = await esvaziarFila();
+  if (!filaOk && getFila().length) {
+    setDbStatus(false, `Há ${getFila().length} alteração(ões) por enviar. A tentar novamente...`);
+    return;
+  }
+  // 2) Depois lê o que está online
+  const r = await dbCallRaw('getAll', {});
   if (!r || !r.ok) { setDbStatus(false, 'Falha ao sincronizar.'); return; }
+  if (getFila().length) return;   // surgiram alterações novas durante a leitura: não sobrepor
+  // Migração (1 vez): cotações locais que não existem online são enviadas
+  if (!localStorage.getItem('migracaoFila') && Array.isArray(r.cotacoes)) {
+    const remotas = new Set(r.cotacoes.map(c => String(c.num)));
+    JSON.parse(localStorage.getItem('cotacoes') || '[]').forEach(c => { if (!remotas.has(String(c.num)) && (pode('todasCot') || c.criadoPor === SESSAO.username)) enfileirar('saveCotacao', { cotacao: c }); });
+    localStorage.setItem('migracaoFila', '1');
+    if (getFila().length) { esvaziarFila().then(() => sincronizarTudo()); return; }
+  }
 
   // Config da empresa
   if (r.config) {
@@ -1094,6 +1353,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   iniciarLigacaoPersistente();
+  iniciarVigilanciaOffline();
+  if (SESSAO) atualizarBannerOffline();
 });
 
 /* ════════════════════════════════════════════════════════════════
@@ -1755,6 +2016,15 @@ function confirmarGuardar() {
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
   const idx = cots.findIndex(c=>c.num===num);
   const anterior = idx>=0 ? cots[idx] : null;
+  // Identidade e datas: a data/hora de CRIAÇÃO nunca muda; só a de modificação
+  const agoraISO = new Date().toISOString();
+  cot.uid = (anterior && anterior.uid) || novoUid();
+  cot.criadoEm = (anterior && (anterior.criadoEm || anterior.savedAt)) || agoraISO;
+  cot.savedAt = cot.criadoEm;
+  cot.modificadoEm = agoraISO;
+  cot.impressoes = ((anterior && anterior.impressoes) || 0) + (anterior ? 0 : _impressoesForm);
+  cot.ultimaImpressao = (anterior && anterior.ultimaImpressao) || '';
+  _impressoesForm = 0;
   cot.criadoPor = (anterior && anterior.criadoPor) || (SESSAO && SESSAO.username) || '';
   cot.modificadoPor = (SESSAO && SESSAO.username) || '';
   if (idx>=0) cots[idx]=cot; else cots.unshift(cot);
@@ -1801,6 +2071,7 @@ function renderCotList() {
 }
 
 function carregarCotacao(num) {
+  _impressoesForm = 0;
   const c = JSON.parse(localStorage.getItem('cotacoes')||'[]').find(x=>x.num===num);
   if (!c) return;
   ['num','data','venc','validade','moeda','cond','tempo','obs'].forEach(f => {
@@ -1951,17 +2222,28 @@ function buildDoc(d) {
   // ── Conteúdo que muda conforme o tipo de documento ──
   const tp = d.tipo || 'COT';
   const par = (l, v) => `<div><span style="color:#555">${l}: </span><span style="font-weight:600">${v}</span></div>`;
+  // Vencimento: se já passou → "VENCIDO em <data>"; senão mostra a data do termo
+  const vencInfo = (() => {
+    let venc = d.venc;
+    if (!venc && d.data && d.validade) { const x = new Date(d.data + 'T00:00:00'); x.setDate(x.getDate() + (+d.validade || 0)); venc = dataLocalISO(x); }
+    if (!venc) return '—';
+    let vencido = String(venc).slice(0, 10) < hojeISO();
+    if (d.tipo === 'FT') vencido = vencido && d.estado !== 'Anulado' && infoDoc(d, pagosPorFactura()).saldo > 0.005;
+    return vencido ? `<span style="color:#c0392b;font-weight:800">VENCIDO em ${fmtDate(venc)}</span>` : fmtDate(venc);
+  })();
+  const nReimp = +d.impressoes || 0;
+  const agoraTxt = (() => { const n = new Date(); return fmtDate(dataLocalISO(n)) + ' ' + String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); })();
   let metaBase, condTitulo = 'Condições', condHTML;
   if (tp === 'FT') {
-    metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Data',cotData],['Vencimento',cotVenc],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
+    metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Data',cotData],['Vencimento',vencInfo],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
     condTitulo = 'Dados da Factura';
-    condHTML = par('Cond. de pagamento', esc(cotCond)) + par('Vencimento', cotVenc) + par('Ref. cotação', esc(d.origem||'—'));
+    condHTML = par('Cond. de pagamento', esc(cotCond)) + par('Vencimento', vencInfo) + par('Ref. cotação', esc(d.origem||'—'));
   } else if (tp === 'VD') {
     metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Data',cotData],['Pagamento',esc(d.metodo||'—')],['Ref. Cotação',esc(d.origem||'—')],['Moeda',moeda]];
     condTitulo = 'Dados do Pagamento';
     condHTML = par('Método de pagamento', esc(d.metodo||'—')) + par('Valor recebido', fmt(total)+' '+moeda) + par('Ref. cotação', esc(d.origem||'—'));
   } else {
-    metaBase = [['Nº Contrib.',empNuit||'—'],['Vencimento',cotVenc],['Validade',cotVal+' dias'],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
+    metaBase = [['Nº Contrib.',empNuit||'—'],['Vencimento',vencInfo],['Validade',cotVal+' dias'],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
     condHTML = par('Tempo de execução', esc(cotTempo)) + par('Validade da cotação', cotVal+' dias') + par('Cond. de pagamento', esc(cotCond));
   }
 
@@ -1972,8 +2254,9 @@ function buildDoc(d) {
     <div style="text-align:right">
       <div style="font-size:${T.titulo.length>10?18:24}px;font-weight:700;color:${cor};letter-spacing:2px">${T.titulo}</div>
       <div style="font-size:14px;font-weight:700;color:${cor};margin-top:2px">Nº ${esc(cotNum)}</div>
-      <div style="font-size:10px;color:#555;margin-top:3px">${cotData}</div>
-      <div style="font-size:9px;background:${d.estado==='Anulado'?'#c0392b':cor};color:#fff;padding:2px 9px;border-radius:3px;display:inline-block;margin-top:5px">${d.estado==='Anulado'?'ANULADO':'Original'}</div>
+      <div style="font-size:10px;color:#555;margin-top:3px">${nReimp > 0 ? 'Emitido em ' : ''}${cotData}</div>
+      <div style="font-size:9px;background:${d.estado==='Anulado'?'#c0392b':(nReimp>0?'#b45309':cor)};color:#fff;padding:2px 9px;border-radius:3px;display:inline-block;margin-top:5px">${d.estado==='Anulado'?'ANULADO':(nReimp>0?'REIMPRESSÃO':'Original')}</div>
+      ${nReimp > 0 ? `<div style="font-size:8.5px;color:#b45309;font-weight:700;margin-top:3px">Reimpressão nº ${nReimp} · ${agoraTxt}</div>` : ''}
     </div>
   </div>
 
@@ -2234,11 +2517,37 @@ function exportarPDF() {
   // fallback caso onload não dispare (alguns browsers com document.write)
   setTimeout(() => { if (!win.closed) triggerPrint(); }, 600);
 
+  registarImpressao(dAtual);
   showToast('🖨️ Use "Guardar como PDF" na janela de impressão para obter o ficheiro.');
+}
+
+// Conta a impressão: a 1.ª é "Original"; as seguintes saem como "Reimpressão" (data de emissão mantida)
+function registarImpressao(d) {
+  const agora = new Date().toISOString();
+  if ((d.tipo || 'COT') === 'COT') {
+    const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]');
+    const i = cots.findIndex(c => c.num === d.num);
+    if (i >= 0) {
+      cots[i].impressoes = (+cots[i].impressoes || 0) + 1;
+      cots[i].ultimaImpressao = agora;
+      localStorage.setItem('cotacoes', JSON.stringify(cots));
+      if (temDB()) dbCall('saveCotacao', { cotacao: cots[i] });
+    } else { _impressoesForm++; }
+  } else {
+    const doc = getDocs().find(x => x.id === d.id);
+    if (doc) {
+      doc.impressoes = (+doc.impressoes || 0) + 1;
+      doc.ultimaImpressao = agora;
+      guardarDoc(doc);
+      _docPreview = getDocs().find(x => x.id === d.id) || _docPreview;
+    }
+  }
+  if (document.getElementById('tab-preview').classList.contains('active')) gerarPreview();
 }
 
 /* ────────── LIMPAR */
 function limparFormSilencioso() {
+  _impressoesForm = 0;
   items=[]; itemIdx=0;
   ['cli-nome','cli-nuit','cli-end','cli-cidade','cli-tel','cli-email'].forEach(f=>{
     const el=document.getElementById(f); if(el) el.value='';
@@ -2316,7 +2625,9 @@ const TIPOS_DOC = {
   VD:  { nome: 'Venda a Dinheiro', titulo: 'VENDA A DINHEIRO', pref: 'VD ', seq: 'vdSeq', cfg: 'cfg-prefix-vd' },
   RC:  { nome: 'Recibo',           titulo: 'RECIBO',           pref: 'RC ', seq: 'rcSeq', cfg: 'cfg-prefix-rc' }
 };
-const NUM_DOC_CAMPOS = ['sub','desconto','descValor','iva','total','valorRecebido','facturaTotal','pagoAnterior','saldoApos'];
+const NUM_DOC_CAMPOS = ['sub','desconto','descValor','iva','total','valorRecebido','facturaTotal','pagoAnterior','saldoApos','impressoes'];
+function novoUid() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10); }
+let _impressoesForm = 0;   // impressões da cotação do formulário ainda não guardada
 
 function round2(x) { return Math.round((+x || 0) * 100) / 100; }
 function hojeISO() { return dataLocalISO(new Date()); }
@@ -2327,9 +2638,12 @@ function dadosDoForm() {
     moeda: gv('cot-moeda'), cond: gv('cot-cond'), tempo: gv('cot-tempo'), obs: gv('cot-obs'),
     cliNome: gv('cli-nome'), cliNuit: gv('cli-nuit'), cliEnd: gv('cli-end'),
     cliCidade: gv('cli-cidade'), cliTel: gv('cli-tel'), cliEmail: gv('cli-email'),
-    items: items, descTipo: gv('cot-desc-tipo'), descValor: gv('cot-desc-valor')
+    items: items, descTipo: gv('cot-desc-tipo'), descValor: gv('cot-desc-valor'),
+    impressoes: impressoesDaCotacao(gv('cot-num'))
   };
 }
+function cotGuardada(num) { return JSON.parse(localStorage.getItem('cotacoes') || '[]').find(c => c.num === num); }
+function impressoesDaCotacao(num) { const sv = cotGuardada(num); return sv ? (+sv.impressoes || 0) : _impressoesForm; }
 function cotacaoDoForm() {
   const t = calcTotaisComDesconto();
   return Object.assign(dadosDoForm(), {
@@ -2482,7 +2796,7 @@ function confirmarEmitir() {
     cliCidade: cot.cliCidade || '', cliTel: cot.cliTel || '', cliEmail: cot.cliEmail || '',
     items: JSON.parse(JSON.stringify(cot.items || [])),
     sub: cot.sub, descTipo: cot.descTipo || 'pct', descValor: cot.descValor, desconto: cot.desconto, iva: cot.iva, total,
-    valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || ''
+    valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
   guardarDoc(doc);
   registarSeqDoc(tipo, seqDeNum(num));
@@ -2525,7 +2839,7 @@ function confirmarRecibo() {
     estado: 'Emitido', origem: f.num, facturaId: f.id,
     cliNome: f.cliNome, cliNuit: f.cliNuit, cliEnd: f.cliEnd, cliCidade: f.cliCidade, cliTel: f.cliTel, cliEmail: f.cliEmail,
     items: [], sub: 0, descTipo: 'pct', descValor: 0, desconto: 0, iva: 0, total: valor, valorRecebido: valor,
-    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || ''
+    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
   guardarDoc(doc);
   registarSeqDoc('RC', seqDeNum(num));
@@ -2614,8 +2928,9 @@ function buildRecibo(d) {
     <div style="text-align:right">
       <div style="font-size:24px;font-weight:700;color:${cor};letter-spacing:2px">RECIBO</div>
       <div style="font-size:14px;font-weight:700;color:${cor};margin-top:2px">Nº ${esc(d.num)}</div>
-      <div style="font-size:10px;color:#555;margin-top:3px">${fmtDate(d.data)}</div>
-      <div style="font-size:9px;background:${anul ? '#c0392b' : cor};color:#fff;padding:2px 9px;border-radius:3px;display:inline-block;margin-top:5px">${anul ? 'ANULADO' : 'Original'}</div>
+      <div style="font-size:10px;color:#555;margin-top:3px">${(+d.impressoes || 0) > 0 ? 'Emitido em ' : ''}${fmtDate(d.data)}</div>
+      <div style="font-size:9px;background:${anul ? '#c0392b' : ((+d.impressoes || 0) > 0 ? '#b45309' : cor)};color:#fff;padding:2px 9px;border-radius:3px;display:inline-block;margin-top:5px">${anul ? 'ANULADO' : ((+d.impressoes || 0) > 0 ? 'REIMPRESSÃO' : 'Original')}</div>
+      ${(+d.impressoes || 0) > 0 ? `<div style="font-size:8.5px;color:#b45309;font-weight:700;margin-top:3px">Reimpressão nº ${+d.impressoes} · ${fmtDate(hojeISO())}</div>` : ''}
     </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin-bottom:6mm">
