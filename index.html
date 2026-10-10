@@ -616,6 +616,7 @@ async function sincronizarTudo() {
   // Config da empresa
   if (r.config) {
     Object.keys(r.config).forEach(k => {
+      if (k === 'cotSeq') return;   // tratado abaixo: fica sempre o MAIOR valor
       if (r.config[k] !== '' && r.config[k] != null) localStorage.setItem(k, r.config[k]);
     });
     carregarConfig();
@@ -638,6 +639,15 @@ async function sincronizarTudo() {
     }));
     localStorage.setItem('cotacoes', JSON.stringify(cots));
   }
+  // Numeração: fica o maior entre o contador local, o da Base de Dados e as cotações existentes
+  const seqRemoto = parseInt((r.config && r.config.cotSeq) || 0) || 0;
+  const seqFinal = Math.max(seqRemoto, seqMaximo());
+  const seqLocal = parseInt(localStorage.getItem('cotSeq') || 0) || 0;
+  if (seqFinal > seqLocal) localStorage.setItem('cotSeq', seqFinal);
+  if (seqFinal > seqRemoto) dbCall('saveConfig', { config: { cotSeq: String(seqFinal) } });
+  // Se o formulário ainda mostra um número automático por gravar, actualiza-o
+  if (_numAuto && gv('cot-num') === _numAuto) autoNum();
+
   setDbStatus(true, 'Ligado e sincronizado com a Base de Dados Google Sheets.');
   showToast('🔄 Sincronização concluída!');
   // re-renderiza os ecrãs visíveis, se aplicável
@@ -751,15 +761,42 @@ function setDefaultDates() {
   document.getElementById('cot-venc').value = dataLocalISO(v);
 }
 
+/* Numeração sequencial segura: nunca recua. O próximo número é sempre
+   (maior sequência já usada) + 1, olhando para o contador guardado E para
+   todas as cotações guardadas (locais ou vindas da Base de Dados). */
+let _numAuto = '';
+function seqDeNum(num) {
+  const m = String(num || '').match(/(\d+)\//);
+  return m ? parseInt(m[1], 10) : 0;
+}
+function seqMaximo() {
+  let max = parseInt(localStorage.getItem('cotSeq') || 0) || 0;
+  try {
+    JSON.parse(localStorage.getItem('cotacoes') || '[]').forEach(c => {
+      const n = seqDeNum(c.num); if (n > max) max = n;
+    });
+  } catch (e) {}
+  return max;
+}
+// Sobe o contador (nunca desce) e, se subiu, envia-o para a Base de Dados.
+function registarSeq(n) {
+  const atual = parseInt(localStorage.getItem('cotSeq') || 0) || 0;
+  if (n > atual) {
+    localStorage.setItem('cotSeq', n);
+    if (temDB()) dbCall('saveConfig', { config: { cotSeq: String(n) } });
+  }
+}
+
 function autoNum() {
-  const seq = parseInt(localStorage.getItem('cotSeq') || 0) + 1;
+  const seq = seqMaximo() + 1;
   const prefix = localStorage.getItem('cfg-prefix') || '';
   const seqStr = String(seq).padStart(4, '0');
   const hoje = new Date();
   const dd = String(hoje.getDate()).padStart(2, '0');
   const mm = String(hoje.getMonth() + 1).padStart(2, '0');
   const aaaa = hoje.getFullYear();
-  document.getElementById('cot-num').value = prefix + seqStr + '/' + dd + mm + aaaa;
+  _numAuto = prefix + seqStr + '/' + dd + mm + aaaa;
+  document.getElementById('cot-num').value = _numAuto;
 }
 
 /* ────────── TABS */
@@ -1301,8 +1338,7 @@ function confirmarGuardar() {
   if (idx>=0) cots[idx]=cot; else cots.unshift(cot);
   localStorage.setItem('cotacoes', JSON.stringify(cots));
   // auto-increment seq
-  const m = num.match(/(\d+)\//);
-  if (m) localStorage.setItem('cotSeq', parseInt(m[1]));
+  registarSeq(seqDeNum(num));   // só sobe — editar uma cotação antiga já não faz recuar a numeração
   // guardar produtos automaticamente
   guardarProdutosDaCotacao();
   fecharModal();
