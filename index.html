@@ -130,7 +130,7 @@ textarea{resize:vertical;min-height:58px}
 }
 .cot-pages{display:flex;flex-direction:column;align-items:center;gap:8mm}
 /* Cada folha = 1 página A4 fixa (296mm evita página em branco ao imprimir) */
-.cot-page{height:296mm;overflow:hidden;page-break-after:always;break-after:page}
+.cot-page{height:296mm;overflow:hidden;position:relative;page-break-after:always;break-after:page}
 .cot-page:last-child{page-break-after:auto;break-after:auto}
 .cot-doc-body{flex:1;display:flex;flex-direction:column}
 .cot-doc-footer{margin-top:auto;padding-top:6mm}
@@ -225,6 +225,10 @@ body.locked{overflow:hidden}
     </div>
     <div class="field"><label>Valor do Desconto</label><input type="number" id="cot-desc-valor" value="0" min="0" step="0.01" oninput="calcTotals()"></div>
     <div class="field"></div>
+  </div>
+  <div class="field" style="margin-top:10px">
+    <label>Observações (opcional — aparecem na cotação se preenchidas)</label>
+    <textarea id="cot-obs" rows="3" placeholder="Ex.: Preços sujeitos a alteração. Entrega no local do cliente. Pagamento 50% na adjudicação..."></textarea>
   </div>
 
   <div class="section-title" style="margin-top:20px">
@@ -629,6 +633,7 @@ async function sincronizarTudo() {
     const cots = r.cotacoes.map(c => ({
       ...c,
       sub: +c.sub||0, iva: +c.iva||0, total: +c.total||0,
+      obs: c.obs ? String(c.obs) : '',
       items: Array.isArray(c.items) ? c.items : []
     }));
     localStorage.setItem('cotacoes', JSON.stringify(cots));
@@ -1283,7 +1288,7 @@ function confirmarGuardar() {
   const t = calcTotaisComDesconto();
   const cot = {
     num, data:gv('cot-data'), venc:gv('cot-venc'), validade:gv('cot-validade'),
-    moeda:gv('cot-moeda'), cond:gv('cot-cond'), tempo:gv('cot-tempo'),
+    moeda:gv('cot-moeda'), cond:gv('cot-cond'), tempo:gv('cot-tempo'), obs:gv('cot-obs'),
     cliNome:gv('cli-nome'), cliNuit:gv('cli-nuit'), cliEnd:gv('cli-end'),
     cliCidade:gv('cli-cidade'), cliTel:gv('cli-tel'), cliEmail:gv('cli-email'),
     items:JSON.parse(JSON.stringify(items)),
@@ -1336,7 +1341,7 @@ function renderCotList() {
 function carregarCotacao(num) {
   const c = JSON.parse(localStorage.getItem('cotacoes')||'[]').find(x=>x.num===num);
   if (!c) return;
-  ['num','data','venc','validade','moeda','cond','tempo'].forEach(f => {
+  ['num','data','venc','validade','moeda','cond','tempo','obs'].forEach(f => {
     const el = document.getElementById('cot-'+f); if(el) el.value=c[f]||'';
   });
   document.getElementById('cot-desc-tipo').value  = c.descTipo || 'pct';
@@ -1436,6 +1441,7 @@ function buildDoc() {
   const cotVal   = gv('cot-validade') || '15';
   const moeda    = gv('cot-moeda') || 'MT';
   const rodape   = lsv('cfg-rodape') || 'Documento Processado por Computador';
+  const cotObs   = gv('cot-obs').trim();
 
   let sub=0, ivaBruto=0;
   items.forEach(it=>{ const b=calcLiq(it); sub+=b; ivaBruto+=b*(it.iva/100); });
@@ -1540,7 +1546,13 @@ function buildDoc() {
       <div><span style="color:#555">Cond. de pagamento: </span><span style="font-weight:600">${esc(cotCond)}</span></div>
     </div>
   </div>
-
+${cotObs ? `
+  <!-- OBSERVAÇÕES -->
+  <div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm;font-size:10px;margin-top:3mm">
+    <div style="font-size:8px;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px">Observações</div>
+    <div style="white-space:pre-wrap;line-height:1.5;color:#333">${esc(cotObs)}</div>
+  </div>
+` : ''}
 `;
   const htmlRodape = `<div class="cot-doc-footer">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16mm;margin-bottom:8mm">
@@ -1560,7 +1572,7 @@ function buildDoc() {
     const logo = logoData
       ? `<div style="height:${logo2H}mm;display:flex;justify-content:center;align-items:center"><img src="${logoData}" style="max-height:${logo2H}mm;max-width:50mm;object-fit:contain;display:block"></div>`
       : `<div style="text-align:center;font-weight:700;font-size:12px;letter-spacing:1px;color:${cor}">${esc(empNome)}</div>`;
-    return `${logo}<div style="text-align:center;font-size:9.5px;color:#555;margin:2mm 0 6mm">Cotação Nº <strong style="color:${cor}">${esc(cotNum)}</strong> &nbsp;·&nbsp; Pág. ${n}/${tot}</div>`;
+    return `${logo}<div style="text-align:center;font-size:9.5px;color:#555;margin:2mm 0 0">Cotação Nº <strong style="color:${cor}">${esc(cotNum)}</strong></div><div style="height:30mm"></div>`;
   };
   const tabHTML = (linhas) => `<table style="margin-bottom:4mm">${theadHTML}<tbody>${linhas}</tbody></table>`;
 
@@ -1604,6 +1616,7 @@ function buildDoc() {
 
   return `<div class="cot-pages">` + pages.map((p, i) => `
 <div class="cot-doc cot-page">
+${pages.length > 1 ? `<div style="position:absolute;left:0;right:0;bottom:4.5mm;text-align:center;font-size:9px;color:#888">Pág. ${i + 1}/${pages.length}</div>` : ''}
 <div class="cot-doc-body">
   ${p.first ? htmlTopo : logoPag2(i + 1, pages.length)}
   ${p.rows.length ? tabHTML(p.rows.join('')) : ''}
@@ -1705,7 +1718,7 @@ function exportarPDF() {
       color-adjust: exact !important;
     }
     .cot-pages{display:block}
-    .cot-page{height:296mm;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto}
+    .cot-page{height:296mm;overflow:hidden;position:relative;page-break-after:always;break-after:page;margin:0 auto}
     .cot-page:last-child{page-break-after:auto;break-after:auto}
     @page{size:A4;margin:0}
     @media print{
@@ -1747,6 +1760,7 @@ function limparFormSilencioso() {
   });
   document.getElementById('cot-cond').value='Pronto Pagamento';
   document.getElementById('cot-tempo').value='Entrega imediata';
+  document.getElementById('cot-obs').value='';
   document.getElementById('cot-validade').value='15';
   document.getElementById('cot-desc-tipo').value='pct';
   document.getElementById('cot-desc-valor').value='0';
