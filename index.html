@@ -402,7 +402,9 @@ body.locked{overflow:hidden}
     <div class="btn-bar" style="margin-top:10px">
       <button class="btn btn-primary btn-sm" onclick="ligarBaseDados()">🔌 Ligar / Testar</button>
       <button class="btn btn-success btn-sm" onclick="sincronizarTudo()">🔄 Sincronizar Agora</button>
+      <button class="btn btn-secondary btn-sm" onclick="diagnosticoDB()">🔍 Diagnóstico</button>
     </div>
+    <pre id="db-diag" style="display:none;margin-top:10px;padding:10px;background:#f6f8fc;border:1px solid var(--border);border-radius:6px;font-size:11px;white-space:pre-wrap;max-height:320px;overflow:auto"></pre>
     <p style="font-size:11px;color:var(--muted);margin-top:8px">
       Veja o ficheiro <strong>Code.gs</strong> fornecido para instruções de como criar a Google Sheet e publicar o Apps Script. Cole aqui o URL terminado em <code>/exec</code>.
     </p>
@@ -706,6 +708,26 @@ function setDbStatus(online, msg) {
   box.className = 'alert ' + (online ? 'alert-success' : 'alert-info');
 }
 
+async function diagnosticoDB() {
+  const box = document.getElementById('db-diag');
+  box.style.display = 'block';
+  box.textContent = 'A consultar a Base de Dados...';
+  const r = await dbCall('diagnostico', {});
+  if (!r) { box.textContent = '❌ Sem resposta do servidor. Verifique o URL e se a implementação está com acesso "Qualquer pessoa".'; return; }
+  if (r.ok === false) {
+    box.textContent = '⚠️ ' + r.error + '\n\nSe diz "Acção desconhecida", o Apps Script ainda é a versão antiga: cole o novo Code.gs e use Implementar → Gerir implementações → Editar → Nova versão.';
+    return;
+  }
+  const loc = k => { try { return JSON.parse(localStorage.getItem(k) || '[]').length; } catch (e) { return 0; } };
+  box.textContent =
+    `Script versão: ${r.versao}\nSheet: ${r.planilha}\n\n` +
+    `Folha usada → registos lidos:\n` +
+    Object.keys(r.usadas).map(t => `  ${t}: "${r.usadas[t]}" → ${r.contagens[t]}`).join('\n') +
+    `\n\nNeste dispositivo: ${loc('cotacoes')} cotações · ${loc('clientes')} clientes · ${loc('produtos')} produtos · ${loc('documentos')} documentos\n\n` +
+    `Folhas existentes na Sheet:\n` +
+    r.folhas.map(f => `  • "${f.nome}" (${f.linhas} linhas)\n      colunas: ${f.cabecalho.join(' | ') || '(vazia)'}`).join('\n');
+}
+
 async function ligarBaseDados() {
   const url = gv('cfg-db-url').trim();
   if (!url) { showToast('⚠️ Cole o URL da Base de Dados primeiro.'); return; }
@@ -737,23 +759,35 @@ async function sincronizarTudo() {
     });
     carregarConfig();
   }
+  // Regra de segurança: se a Base de Dados devolver uma lista VAZIA mas este dispositivo
+  // tem dados, não apaga nada — mantém o local e reenvia-o para a Base de Dados.
+  const localDe = k => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };
+  const avisos = [];
   // Clientes
   if (Array.isArray(r.clientes)) {
-    localStorage.setItem('clientes', JSON.stringify(r.clientes.map(c => ({...c, id: normId(c.id)}))));
+    if (r.clientes.length || !localDe('clientes').length) {
+      localStorage.setItem('clientes', JSON.stringify(r.clientes.map(c => ({...c, id: normId(c.id)}))));
+    } else { avisos.push('clientes'); localDe('clientes').forEach(c => dbCall('saveCliente', { cliente: c })); }
   }
   // Produtos
   if (Array.isArray(r.produtos)) {
-    localStorage.setItem('produtos', JSON.stringify(r.produtos.map(p => ({...p, id: normId(p.id), pu: +p.pu||0, iva: +p.iva||0}))));
+    if (r.produtos.length || !localDe('produtos').length) {
+      localStorage.setItem('produtos', JSON.stringify(r.produtos.map(p => ({...p, id: normId(p.id), pu: +p.pu||0, iva: +p.iva||0}))));
+    } else { avisos.push('produtos'); localDe('produtos').forEach(p => dbCall('saveProduto', { produto: p })); }
   }
   // Cotações
   if (Array.isArray(r.cotacoes)) {
-    const cots = r.cotacoes.map(c => ({
-      ...c,
-      sub: +c.sub||0, iva: +c.iva||0, total: +c.total||0,
-      obs: c.obs ? String(c.obs) : '',
-      items: Array.isArray(c.items) ? c.items : []
-    }));
-    localStorage.setItem('cotacoes', JSON.stringify(cots));
+    if (r.cotacoes.length || !localDe('cotacoes').length) {
+      const cots = r.cotacoes.map(c => ({
+        ...c,
+        num: String(c.num == null ? '' : c.num),
+        sub: +c.sub||0, iva: +c.iva||0, total: +c.total||0,
+        moeda: c.moeda || 'MT',
+        obs: c.obs ? String(c.obs) : '',
+        items: Array.isArray(c.items) ? c.items : []
+      })).filter(c => c.num);
+      localStorage.setItem('cotacoes', JSON.stringify(cots));
+    } else { avisos.push('cotações'); localDe('cotacoes').forEach(c => dbCall('saveCotacao', { cotacao: c })); }
   }
   // Documentos (Facturas · VD · Recibos)
   if (Array.isArray(r.documentos)) mesclarDocumentos(r.documentos);
@@ -774,8 +808,11 @@ async function sincronizarTudo() {
   // Se o formulário ainda mostra um número automático por gravar, actualiza-o
   if (_numAuto && gv('cot-num') === _numAuto) autoNum();
 
-  setDbStatus(true, 'Ligado e sincronizado com a Base de Dados Google Sheets.');
-  showToast('🔄 Sincronização concluída!');
+  const nR = k => Array.isArray(r[k]) ? r[k].length : 0;
+  setDbStatus(true, `Ligado. Na Base de Dados: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos` +
+    (r.versao ? ` (script ${r.versao})` : ' (script antigo — actualize o Code.gs)') +
+    (avisos.length ? `. ⚠️ A Base de Dados devolveu ${avisos.join(', ')} vazios; mantive os dados deste dispositivo e reenviei-os.` : '.'));
+  showToast(avisos.length ? '⚠️ Base de Dados sem ' + avisos.join(', ') + ' — dados locais mantidos' : '🔄 Sincronização concluída!');
   // re-renderiza os ecrãs visíveis, se aplicável
   const ativo = document.querySelector('.tab.active');
   if (ativo) {
@@ -1984,8 +2021,16 @@ document.addEventListener('click', e => {
 function gv(id)  { return (document.getElementById(id)||{}).value||''; }
 function lsv(k)  { return localStorage.getItem(k)||''; }
 function esc(s)  { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function fmt(n)  { return Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,'.').replace(/\.(\d+)$/,',$1'); }
-function fmtDate(s){ if(!s) return '—'; const [y,m,d]=s.split('-'); return `${d}-${m}-${y}`; }
+function fmt(n)  { return (Number(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,'.').replace(/\.(\d+)$/,',$1'); }
+function fmtDate(s){
+  if(!s) return '—';
+  s = String(s).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (m) return `${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}-${m[3]}`;
+  return s;
+}
 
 function showToast(msg) {
   let t=document.getElementById('toast');
