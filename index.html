@@ -202,7 +202,7 @@ body.locked{overflow:hidden}
       <label>Palavra-passe</label>
       <input type="password" id="login-pass" placeholder="Palavra-passe" autocomplete="current-password" onkeydown="if(event.key==='Enter') confirmarLogin()">
     </div>
-    <button class="btn btn-primary" onclick="confirmarLogin()">Entrar</button>
+    <button class="btn btn-primary" id="login-btn" onclick="confirmarLogin()">Entrar</button>
     <div class="login-erro" id="login-erro">Utilizador ou palavra-passe incorrectos.</div>
   </div>
 </div>
@@ -216,7 +216,8 @@ body.locked{overflow:hidden}
   <div class="tab" onclick="switchTab('produtos')">📦 Produtos</div>
   <div class="tab" onclick="switchTab('preview')">👁️ Pré-visualizar</div>
   <div class="tab" onclick="abrirConfigComPin()">⚙️ Configurações</div>
-  <div class="tab" onclick="terminarSessao()" style="margin-left:auto;flex:0">🚪 Sair</div>
+  <div class="tab" id="user-chip" onclick="abrirMinhaConta()" title="A minha conta" style="margin-left:auto;flex:0;white-space:nowrap">👤</div>
+  <div class="tab" onclick="terminarSessao()" style="flex:0">🚪 Sair</div>
 </div>
 
 <!-- ══════════════════════════════════ TAB: NOVA COTAÇÃO -->
@@ -306,8 +307,8 @@ body.locked{overflow:hidden}
     <button class="btn btn-primary" onclick="switchTab('preview');gerarPreview()">👁️ Pré-visualizar</button>
     <button class="btn btn-success" onclick="exportarPDF()">⬇️ Exportar PDF</button>
     <button class="btn btn-secondary" onclick="guardarCotacao()">💾 Guardar Cotação</button>
-    <button class="btn btn-warning" onclick="abrirEmitir('FT','__form__')" title="Gera uma Factura com os dados desta cotação">🧾 Gerar Factura</button>
-    <button class="btn btn-warning" onclick="abrirEmitir('VD','__form__')" title="Gera uma Venda a Dinheiro com os dados desta cotação">💵 Venda a Dinheiro</button>
+    <button class="btn btn-warning" data-perm="emitir" onclick="abrirEmitir('FT','__form__')" title="Gera uma Factura com os dados desta cotação">🧾 Gerar Factura</button>
+    <button class="btn btn-warning" data-perm="emitir" onclick="abrirEmitir('VD','__form__')" title="Gera uma Venda a Dinheiro com os dados desta cotação">💵 Venda a Dinheiro</button>
     <button class="btn btn-secondary" onclick="limparForm()">🗑️ Nova / Limpar</button>
   </div>
 </div>
@@ -317,7 +318,7 @@ body.locked{overflow:hidden}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <h2 style="font-size:16px;font-weight:700">Cotações Guardadas</h2>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-danger btn-sm" onclick="apagarTodasCotacoes()">🗑️ Apagar Todas</button>
+      <button class="btn btn-danger btn-sm" data-perm="apagarTudo" onclick="apagarTodasCotacoes()">🗑️ Apagar Todas</button>
       <button class="btn btn-primary btn-sm" onclick="switchTab('cotacao')">+ Nova Cotação</button>
     </div>
   </div>
@@ -388,7 +389,22 @@ body.locked{overflow:hidden}
 
 <!-- ══════════════════════════════════ TAB: CONFIGURAÇÕES -->
 <div class="panel" id="tab-config">
-  <div class="card">
+  <div class="card" id="card-utilizadores" data-perm="utilizadores">
+    <div class="card-title">👥 Utilizadores e Perfis de Acesso</div>
+    <div class="alert alert-info" style="font-size:12px;line-height:1.7">
+      <strong>Master</strong> — acesso total, Base de Dados e todos os utilizadores.<br>
+      <strong>Admin</strong> — tudo (cotações, facturação, resumos, configurações da empresa) e gere Usuários e Cotacionários.<br>
+      <strong>Usuário</strong> — cotações, facturas/VD/recibos e produtos; sem resumos, configurações, anular nem apagar cotações.<br>
+      <strong>Cotacionário</strong> — só cria e edita as <u>suas</u> cotações.
+    </div>
+    <div class="btn-bar" style="margin-bottom:10px">
+      <button class="btn btn-primary btn-sm" onclick="abrirUsuarioModal()">➕ Novo utilizador</button>
+      <button class="btn btn-secondary btn-sm" onclick="carregarUsuarios()">🔄 Actualizar lista</button>
+    </div>
+    <div id="usr-list" class="res-wrap"><p style="font-size:12px;color:var(--muted)">A carregar...</p></div>
+  </div>
+
+  <div class="card" data-perm="db">
     <div class="card-title">☁️ Base de Dados (Google Sheets)</div>
     <div class="alert alert-info" id="db-status-box">
       <span id="db-status-dot">⚪</span> <span id="db-status-text">Ainda não ligado a nenhuma Base de Dados. Os dados estão a ser guardados apenas neste navegador.</span>
@@ -567,6 +583,63 @@ body.locked{overflow:hidden}
   </div>
 </div>
 
+<!-- ══════════════════════════════════ MODAL: UTILIZADOR -->
+<div class="modal-bg" id="modal-usuario">
+  <div class="modal">
+    <h3 id="usr-titulo">➕ Novo utilizador</h3>
+    <input type="hidden" id="usr-id">
+    <div class="form-grid" style="gap:10px">
+      <div class="field"><label>Nome completo</label><input type="text" id="usr-nome"></div>
+      <div class="field"><label>Utilizador (login)</label><input type="text" id="usr-username" autocomplete="off" placeholder="ex.: maria.silva"></div>
+      <div class="field"><label>Perfil de acesso</label><select id="usr-role"></select></div>
+      <div class="field"><label>Estado</label><select id="usr-ativo"><option value="sim">Activo</option><option value="nao">Desactivado</option></select></div>
+      <div class="field s2"><label id="usr-pass-label">Palavra-passe (mín. 6 caracteres)</label><input type="password" id="usr-pass" autocomplete="new-password"></div>
+    </div>
+    <div class="alert alert-info" id="usr-role-desc" style="font-size:12px;margin-top:10px"></div>
+    <div class="alert alert-danger" id="usr-erro" style="display:none;margin-top:8px"></div>
+    <div class="btn-bar">
+      <button class="btn btn-primary" onclick="guardarUsuario()">💾 Guardar</button>
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ MODAL: MINHA CONTA -->
+<div class="modal-bg" id="modal-conta">
+  <div class="modal">
+    <h3>👤 A minha conta</h3>
+    <div class="alert alert-info" id="conta-info" style="font-size:12px"></div>
+    <div id="conta-senha-box">
+      <div class="form-grid" style="gap:10px">
+        <div class="field s2"><label>Palavra-passe actual</label><input type="password" id="conta-atual" autocomplete="current-password"></div>
+        <div class="field"><label>Nova palavra-passe</label><input type="password" id="conta-nova" autocomplete="new-password"></div>
+        <div class="field"><label>Repetir nova palavra-passe</label><input type="password" id="conta-nova2" autocomplete="new-password"></div>
+      </div>
+      <div class="alert alert-danger" id="conta-erro" style="display:none;margin-top:8px"></div>
+    </div>
+    <div class="btn-bar">
+      <button class="btn btn-primary" id="conta-btn" onclick="alterarMinhaSenha()">🔑 Alterar palavra-passe</button>
+      <button class="btn btn-secondary" onclick="fecharModal()">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ MODAL: 1.º ACESSO (criar master) -->
+<div class="modal-bg" id="modal-setup">
+  <div class="modal">
+    <h3>🛡️ Primeiro acesso — criar o utilizador Master</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Ainda não existem utilizadores. Crie agora o utilizador <strong>master</strong> (acesso total). Depois disto, as credenciais de primeiro acesso deixam de funcionar.</p>
+    <div class="form-grid" style="gap:10px">
+      <div class="field"><label>Nome completo</label><input type="text" id="setup-nome"></div>
+      <div class="field"><label>Utilizador (login)</label><input type="text" id="setup-username" autocomplete="off"></div>
+      <div class="field"><label>Palavra-passe (mín. 6)</label><input type="password" id="setup-pass" autocomplete="new-password"></div>
+      <div class="field"><label>Repetir palavra-passe</label><input type="password" id="setup-pass2" autocomplete="new-password"></div>
+    </div>
+    <div class="alert alert-danger" id="setup-erro" style="display:none;margin-top:8px"></div>
+    <div class="btn-bar"><button class="btn btn-primary" id="setup-btn" onclick="confirmarSetupMaster()">✅ Criar Master e entrar</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="modal-pin">
   <div class="modal">
     <h3>🔒 Acesso Restrito</h3>
@@ -593,44 +666,203 @@ body.locked{overflow:hidden}
    apenas enquanto o separador do navegador estiver aberto
    (sessionStorage) — ao fechar o navegador, pede login outra vez.
    ════════════════════════════════════════════════════════════════ */
+// Credenciais de PRIMEIRO ACESSO (só servem para criar o utilizador master ou
+// enquanto o Apps Script for a versão antiga). Depois de existirem utilizadores
+// na Base de Dados, deixam de permitir a entrada.
 const LOGIN_USER = 'dullas';
 const LOGIN_PASS = 'dullayes';
 
-function confirmarLogin() {
-  const user = document.getElementById('login-user').value.trim().toLowerCase();
-  const pass = document.getElementById('login-pass').value;
-  const erro = document.getElementById('login-erro');
-  if (user === LOGIN_USER && pass === LOGIN_PASS) {
-    sessionStorage.setItem('sessaoActiva', '1');
-    document.getElementById('login-screen').classList.add('hidden');
-    document.body.classList.remove('locked');
-    erro.style.display = 'none';
-  } else {
-    erro.style.display = 'block';
-    document.getElementById('login-pass').value = '';
-    document.getElementById('login-pass').focus();
-  }
+let SESSAO = null;          // { username, nome, role, token, legacy? }
+let _bootCred = null;       // credenciais de 1.º acesso usadas para criar o master
+
+/* ────────── PERFIS E PERMISSÕES (a verdadeira protecção está no servidor) */
+const ROLES_INFO = {
+  master:       { nome: 'Master',       desc: 'Acesso total, incluindo Base de Dados e todos os utilizadores.' },
+  admin:        { nome: 'Admin',        desc: 'Tudo (cotações, facturação, resumos, configurações da empresa) e gere Usuários e Cotacionários. Sem acesso à Base de Dados.' },
+  usuario:      { nome: 'Usuário',      desc: 'Cotações, facturas/VD/recibos e produtos. Sem resumos, configurações, anular documentos nem apagar cotações.' },
+  cotacionario: { nome: 'Cotacionário', desc: 'Só cria, edita e pré-visualiza as suas próprias cotações.' }
+};
+const TABS_ORDEM = ['cotacao','guardadas','documentos','resumos','produtos','preview','config'];
+const PERMS = {
+  master:       { tabs: TABS_ORDEM, emitir: 1, anular: 1, apagarCot: 1, apagarTudo: 1, db: 1, utilizadores: 1, todasCot: 1, produtos: 1 },
+  admin:        { tabs: TABS_ORDEM, emitir: 1, anular: 1, apagarCot: 1, utilizadores: 1, todasCot: 1, produtos: 1 },
+  usuario:      { tabs: ['cotacao','guardadas','documentos','produtos','preview'], emitir: 1, todasCot: 1, produtos: 1 },
+  cotacionario: { tabs: ['cotacao','guardadas','preview'] }
+};
+function pode(p)    { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P[p]); }
+function podeVer(t) { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P.tabs.includes(t)); }
+function painelActivo() { const el = document.querySelector('.panel.active'); return el ? el.id.replace('tab-', '') : 'cotacao'; }
+
+function aplicarPermissoes() {
+  const tabs = document.querySelectorAll('.tab');
+  TABS_ORDEM.forEach((id, i) => { if (tabs[i]) tabs[i].style.display = podeVer(id) ? '' : 'none'; });
+  document.querySelectorAll('[data-perm]').forEach(el => { el.style.display = pode(el.dataset.perm) ? '' : 'none'; });
+  const chip = document.getElementById('user-chip');
+  if (chip) chip.textContent = SESSAO ? `👤 ${SESSAO.nome || SESSAO.username} · ${(ROLES_INFO[SESSAO.role] || {}).nome || SESSAO.role}` : '👤';
+  if (SESSAO && !podeVer(painelActivo())) switchTab('cotacao');
 }
 
-function terminarSessao() {
-  if (!confirm('Terminar sessão?')) return;
-  sessionStorage.removeItem('sessaoActiva');
+/* ────────── SHA-256 (para o acesso offline neste dispositivo) */
+function sha256(str) {
+  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const bytes = unescape(encodeURIComponent(str)).split('').map(c => c.charCodeAt(0));
+  const l = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  for (let i = 7; i >= 0; i--) bytes.push(i >= 4 ? 0 : (l >>> (i * 8)) & 0xff);
+  let h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let o = 0; o < bytes.length; o += 64) {
+    const w = new Array(64);
+    for (let i = 0; i < 16; i++) w[i] = (bytes[o+i*4] << 24) | (bytes[o+i*4+1] << 16) | (bytes[o+i*4+2] << 8) | bytes[o+i*4+3];
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i-15],7) ^ rotr(w[i-15],18) ^ (w[i-15] >>> 3);
+      const s1 = rotr(w[i-2],17) ^ rotr(w[i-2],19) ^ (w[i-2] >>> 10);
+      w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0;
+    }
+    let [a,b,c,d,e,f,g,hh] = h;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(e,6) ^ rotr(e,11) ^ rotr(e,25), ch = (e & f) ^ (~e & g);
+      const t1 = (hh + S1 + ch + K[i] + w[i]) | 0;
+      const S0 = rotr(a,2) ^ rotr(a,13) ^ rotr(a,22), mj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + mj) | 0;
+      hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    h = [h[0]+a|0,h[1]+b|0,h[2]+c|0,h[3]+d|0,h[4]+e|0,h[5]+f|0,h[6]+g|0,h[7]+hh|0];
+  }
+  return h.map(x => ('00000000' + (x >>> 0).toString(16)).slice(-8)).join('');
+}
+function hashLocal(salt, pass) { let h = salt + '|' + pass; for (let i = 0; i < 2000; i++) h = sha256(h + salt); return h; }
+
+// Acesso offline: só entra quem já iniciou sessão online NESTE dispositivo (guarda apenas um hash).
+function guardarVerificadorOffline(username, pass, user) {
+  const cache = JSON.parse(localStorage.getItem('authCache') || '{}');
+  const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  cache[username] = { salt, hash: hashLocal(salt, pass), nome: user.nome, role: user.role };
+  localStorage.setItem('authCache', JSON.stringify(cache));
+}
+function verificarOffline(username, pass) {
+  const c = (JSON.parse(localStorage.getItem('authCache') || '{}'))[username];
+  if (!c || hashLocal(c.salt, pass) !== c.hash) return null;
+  return { username, nome: c.nome, role: c.role };
+}
+
+/* ────────── LOGIN / SESSÃO */
+function mostrarErroLogin(msg) {
+  const erro = document.getElementById('login-erro');
+  erro.textContent = msg; erro.style.display = 'block';
+  const p = document.getElementById('login-pass'); p.value = ''; p.focus();
+}
+
+function entrarNoSistema() {
+  sessionStorage.setItem('sessao', JSON.stringify(SESSAO));
+  document.getElementById('login-screen').classList.add('hidden');
+  document.body.classList.remove('locked');
+  document.getElementById('login-erro').style.display = 'none';
+  aplicarPermissoes();
+  if (typeof ligarComRetry === 'function' && temDB()) ligarComRetry();
+}
+
+async function confirmarLogin() {
+  const user = document.getElementById('login-user').value.trim().toLowerCase();
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('login-btn');
+  if (!user || !pass) { mostrarErroLogin('Indique o utilizador e a palavra-passe.'); return; }
+  btn.disabled = true; btn.textContent = 'A entrar...';
+  try {
+    const r = await dbCall('login', { username: user, password: pass });
+    if (r && r.ok) {                                   // utilizador validado no servidor
+      SESSAO = { username: r.user.username, nome: r.user.nome, role: r.user.role, token: r.token };
+      guardarVerificadorOffline(r.user.username, pass, r.user);
+      localStorage.setItem('authAtivo', '1');
+      entrarNoSistema(); return;
+    }
+    if (r && r.code === 'NOUSERS') {                   // ainda não há utilizadores: 1.º acesso
+      if (user === LOGIN_USER && pass === LOGIN_PASS) {
+        _bootCred = { user, pass };
+        SESSAO = { username: user, nome: 'Administrador', role: 'master', token: '', legacy: true };
+        entrarNoSistema(); abrirSetupMaster(); return;
+      }
+      mostrarErroLogin('Ainda não existem utilizadores. Use as credenciais de primeiro acesso.'); return;
+    }
+    if (r && r.ok === false && !/Acção desconhecida/.test(r.error || '')) { mostrarErroLogin(r.error || 'Não foi possível iniciar sessão.'); return; }
+    // Script antigo ou sem ligação: acesso offline (quem já entrou aqui) ou credenciais de 1.º acesso
+    const off = verificarOffline(user, pass);
+    if (off) { SESSAO = Object.assign({ token: '' }, off); entrarNoSistema(); showToast('📴 Modo offline — sem ligação à Base de Dados.'); return; }
+    if (!localStorage.getItem('authAtivo') && user === LOGIN_USER && pass === LOGIN_PASS) {
+      SESSAO = { username: user, nome: 'Administrador', role: 'master', token: '', legacy: true };
+      entrarNoSistema(); return;
+    }
+    mostrarErroLogin(r === null
+      ? 'Sem ligação à Base de Dados. Neste dispositivo só podem entrar offline utilizadores que já iniciaram sessão aqui.'
+      : 'Utilizador ou palavra-passe incorrectos.');
+  } finally { btn.disabled = false; btn.textContent = 'Entrar'; }
+}
+
+function mostrarLogin(msg) {
+  SESSAO = null;
+  sessionStorage.removeItem('sessao');
   document.getElementById('login-screen').classList.remove('hidden');
   document.body.classList.add('locked');
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
-  document.getElementById('login-erro').style.display = 'none';
+  const erro = document.getElementById('login-erro');
+  if (msg) { erro.textContent = msg; erro.style.display = 'block'; } else erro.style.display = 'none';
+  setTimeout(() => document.getElementById('login-user').focus(), 50);
+}
+
+function terminarSessao() {
+  if (!confirm('Terminar sessão?')) return;
+  if (SESSAO && SESSAO.token) dbCall('logout', {});
+  _configDesbloqueado = false;
+  mostrarLogin();
+}
+
+function sessaoExpirada(msg) {
+  if (!SESSAO) return;
+  fecharModal();
+  mostrarLogin(msg || 'Sessão expirada. Inicie sessão novamente.');
 }
 
 function verificarSessao() {
-  if (sessionStorage.getItem('sessaoActiva') === '1') {
+  let sess = null;
+  try { sess = JSON.parse(sessionStorage.getItem('sessao') || 'null'); } catch (e) {}
+  if (sess && sess.username && sess.role) {
+    SESSAO = sess;
     document.getElementById('login-screen').classList.add('hidden');
     document.body.classList.remove('locked');
+    aplicarPermissoes();
   } else {
     document.getElementById('login-screen').classList.remove('hidden');
     document.body.classList.add('locked');
     setTimeout(() => document.getElementById('login-user').focus(), 50);
   }
+}
+
+/* ────────── 1.º ACESSO: criar o utilizador master */
+function abrirSetupMaster() {
+  ['setup-nome','setup-username','setup-pass','setup-pass2'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('setup-erro').style.display = 'none';
+  document.getElementById('modal-setup').classList.add('open');
+}
+async function confirmarSetupMaster() {
+  const erro = document.getElementById('setup-erro');
+  const nome = gv('setup-nome').trim(), username = gv('setup-username').trim().toLowerCase();
+  const p1 = document.getElementById('setup-pass').value, p2 = document.getElementById('setup-pass2').value;
+  const falha = m => { erro.textContent = m; erro.style.display = 'block'; };
+  if (!nome || !username) return falha('Indique o nome e o utilizador.');
+  if (p1.length < 6) return falha('A palavra-passe deve ter pelo menos 6 caracteres.');
+  if (p1 !== p2) return falha('As palavras-passe não coincidem.');
+  const btn = document.getElementById('setup-btn'); btn.disabled = true;
+  const r = await dbCall('setupMaster', { bootUser: _bootCred.user, bootPass: _bootCred.pass, username, nome, password: p1 });
+  btn.disabled = false;
+  if (!r || !r.ok) return falha((r && r.error) || 'Sem ligação à Base de Dados. Tente novamente.');
+  SESSAO = { username: r.user.username, nome: r.user.nome, role: r.user.role, token: r.token };
+  guardarVerificadorOffline(r.user.username, p1, r.user);
+  localStorage.setItem('authAtivo', '1');
+  _bootCred = null;
+  fecharModal(); entrarNoSistema();
+  showToast('✅ Utilizador master criado. Já pode criar os restantes em Configurações.');
 }
 
 /* ────────── STATE */
@@ -674,7 +906,7 @@ async function dbCall(action, payload) {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // evita pre-flight CORS
-      body: JSON.stringify({ action, ...payload })
+      body: JSON.stringify({ action, token: (SESSAO && SESSAO.token) || undefined, ...payload })
     });
 
     if (!res.ok) {
@@ -689,6 +921,8 @@ async function dbCall(action, payload) {
     }
     if (json && json.ok === false) {
       console.warn('[DEBUG] Base de Dados respondeu com erro em "' + action + '":', json.error);
+      if (json.code === 'AUTH') sessaoExpirada(json.error);
+      else if (json.code === 'PERM') showToast('⛔ ' + json.error);
     }
     return json;
   } catch (err) {
@@ -747,7 +981,7 @@ async function ligarBaseDados() {
 
 /* Puxa tudo da Sheet e actualiza o cache local (usado ao ligar e a pedido) */
 async function sincronizarTudo() {
-  if (!temDB()) return;
+  if (!temDB() || !SESSAO) return;
   const r = await dbCall('getAll', {});
   if (!r || !r.ok) { setDbStatus(false, 'Falha ao sincronizar.'); return; }
 
@@ -758,6 +992,12 @@ async function sincronizarTudo() {
       if (r.config[k] !== '' && r.config[k] != null) localStorage.setItem(k, r.config[k]);
     });
     carregarConfig();
+  }
+  // Perfil/nome actualizados pelo servidor (ex.: um admin mudou o perfil deste utilizador)
+  if (r.eu && SESSAO && !SESSAO.legacy && (r.eu.role !== SESSAO.role || r.eu.nome !== SESSAO.nome)) {
+    SESSAO.role = r.eu.role; SESSAO.nome = r.eu.nome;
+    sessionStorage.setItem('sessao', JSON.stringify(SESSAO));
+    aplicarPermissoes();
   }
   // Regra de segurança: se a Base de Dados devolver uma lista VAZIA mas este dispositivo
   // tem dados, não apaga nada — mantém o local e reenvia-o para a Base de Dados.
@@ -843,7 +1083,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (dbInput) dbInput.value = dbUrl;
   if (dbUrl) {
     if (!localStorage.getItem('cfg-db-url')) localStorage.setItem('cfg-db-url', dbUrl);
-    ligarComRetry();
+    if (SESSAO) ligarComRetry();
   } else {
     setDbStatus(false, 'Ainda não ligado a nenhuma Base de Dados. Os dados estão a ser guardados apenas neste navegador.');
   }
@@ -863,6 +1103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 let _syncEmCurso = false;
 
 async function ligarComRetry(tentativa) {
+  if (!SESSAO) return;
   tentativa = tentativa || 1;
   const maxTentativas = 5;
   setDbStatus(false, 'A ligar à Base de Dados' + (tentativa>1 ? ' (tentativa '+tentativa+')' : '') + '...');
@@ -966,6 +1207,7 @@ function autoNum() {
 
 /* ────────── TABS */
 function switchTab(id) {
+  if (SESSAO && !podeVer(id)) { showToast('⛔ O seu perfil não tem acesso a esta área.'); return; }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   const map = {cotacao:0, guardadas:1, documentos:2, resumos:3, produtos:4, preview:5, config:6};
@@ -977,6 +1219,7 @@ function switchTab(id) {
   if (id==='documentos') renderDocList();
   if (id==='resumos') iniciarResumos();
   if (id==='produtos') renderProdList();
+  if (id==='config' && pode('utilizadores')) carregarUsuarios();
 }
 
 /* ────────── PROTECÇÃO POR PIN (separador Configurações) */
@@ -984,6 +1227,9 @@ const CONFIG_PIN = '654321';
 let _configDesbloqueado = false;
 
 function abrirConfigComPin() {
+  // O acesso às Configurações passa a depender do perfil (master/admin) — já não há PIN.
+  if (podeVer('config')) { switchTab('config'); return; }
+  showToast('⛔ O seu perfil não tem acesso às Configurações.'); return;
   if (_configDesbloqueado) { switchTab('config'); return; }
   document.getElementById('pin-input').value = '';
   document.getElementById('pin-erro').style.display = 'none';
@@ -1503,14 +1749,17 @@ function confirmarGuardar() {
   };
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
   const idx = cots.findIndex(c=>c.num===num);
+  const anterior = idx>=0 ? cots[idx] : null;
+  cot.criadoPor = (anterior && anterior.criadoPor) || (SESSAO && SESSAO.username) || '';
+  cot.modificadoPor = (SESSAO && SESSAO.username) || '';
   if (idx>=0) cots[idx]=cot; else cots.unshift(cot);
   localStorage.setItem('cotacoes', JSON.stringify(cots));
   // auto-increment seq
   registarSeq(seqDeNum(num));   // só sobe — editar uma cotação antiga já não faz recuar a numeração
   // guardar produtos automaticamente
-  guardarProdutosDaCotacao();
+  if (pode('produtos')) guardarProdutosDaCotacao();
   fecharModal();
-  showToast('✅ Cotação '+num+' guardada! Produtos actualizados.');
+  showToast('✅ Cotação '+num+' guardada!' + (pode('produtos') ? ' Produtos actualizados.' : ''));
   if (temDB()) {
     console.log('[DEBUG] A enviar cotação para a Base de Dados:', cot);
     dbCall('saveCotacao', { cotacao: cot }).then(r => {
@@ -1522,7 +1771,8 @@ function confirmarGuardar() {
 
 /* ────────── RENDER COT LIST */
 function renderCotList() {
-  const cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
+  let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
+  if (!pode('todasCot')) cots = cots.filter(c => c.criadoPor === (SESSAO && SESSAO.username));   // cotacionário: só as suas
   const wrap = document.getElementById('cot-list-wrap');
   if (!cots.length) {
     wrap.innerHTML=`<div class="empty-state"><div class="big">🗂️</div><p style="font-size:14px;font-weight:600">Nenhuma cotação guardada</p><p style="margin-top:6px;font-size:12px">Crie uma nova cotação e clique em "Guardar Cotação".</p></div>`;
@@ -1535,12 +1785,12 @@ function renderCotList() {
       <div class="cot-card-meta">${fmtDate(c.data)}</div>
       <div class="cot-card-total">${fmt(c.total)} ${c.moeda}</div>
       <div class="cot-card-actions">
-        ${badgeFacturada(c.num)}
-        <button class="btn btn-warning btn-sm" title="Gerar Factura desta cotação" onclick="abrirEmitir('FT','${esc(c.num)}')">🧾 Facturar</button>
-        <button class="btn btn-warning btn-sm" title="Gerar Venda a Dinheiro desta cotação" onclick="abrirEmitir('VD','${esc(c.num)}')">💵 VD</button>
+        ${pode('emitir') ? badgeFacturada(c.num) : ''}
+        ${pode('emitir') ? `<button class="btn btn-warning btn-sm" title="Gerar Factura desta cotação" onclick="abrirEmitir('FT','${esc(c.num)}')">🧾 Facturar</button>
+        <button class="btn btn-warning btn-sm" title="Gerar Venda a Dinheiro desta cotação" onclick="abrirEmitir('VD','${esc(c.num)}')">💵 VD</button>` : ''}
         <button class="btn btn-primary btn-sm" onclick="carregarCotacao('${esc(c.num)}')">✏️ Editar</button>
         <button class="btn btn-success btn-sm" onclick="previewCotacao('${esc(c.num)}')">👁️</button>
-        <button class="btn btn-danger btn-sm" onclick="apagarCotacao('${esc(c.num)}')">🗑️</button>
+        ${pode('apagarCot') ? `<button class="btn btn-danger btn-sm" onclick="apagarCotacao('${esc(c.num)}')">🗑️</button>` : ''}
       </div>
     </div>`).join('')+'</div>';
 }
@@ -1569,6 +1819,7 @@ function previewCotacao(num) {
 }
 
 function apagarCotacao(num) {
+  if (!pode('apagarCot')) { showToast('⛔ Sem permissão para apagar cotações.'); return; }
   if (!confirm('Apagar a cotação '+num+'?')) return;
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]').filter(c=>c.num!==num);
   localStorage.setItem('cotacoes', JSON.stringify(cots));
@@ -1585,6 +1836,7 @@ function apagarCotacao(num) {
 }
 
 async function apagarTodasCotacoes() {
+  if (!pode('apagarTudo')) { showToast('⛔ Só o master pode apagar todas as cotações.'); return; }
   const cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
   if (!cots.length) { showToast('Não há cotações guardadas para apagar.'); return; }
   if (!confirm(`Apagar TODAS as ${cots.length} cotações guardadas? Esta acção não pode ser desfeita.`)) return;
@@ -2014,7 +2266,7 @@ function fecharModal() {
   document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('open'));
 }
 document.addEventListener('click', e => {
-  if (e.target.classList.contains('modal-bg')) fecharModal();
+  if (e.target.classList.contains('modal-bg') && e.target.id !== 'modal-setup') fecharModal();
 });
 
 /* ────────── UTILS */
@@ -2173,6 +2425,7 @@ function badgeFacturada(num) {
 /* ────────── Emitir FACTURA / VD a partir de uma cotação */
 let _emitir = null;
 function abrirEmitir(tipo, ref) {
+  if (!pode('emitir')) { showToast('⛔ O seu perfil não pode emitir facturas, VD ou recibos.'); return; }
   let cot;
   if (ref === '__form__') {
     cot = cotacaoDoForm();
@@ -2224,7 +2477,7 @@ function confirmarEmitir() {
     cliCidade: cot.cliCidade || '', cliTel: cot.cliTel || '', cliEmail: cot.cliEmail || '',
     items: JSON.parse(JSON.stringify(cot.items || [])),
     sub: cot.sub, descTipo: cot.descTipo || 'pct', descValor: cot.descValor, desconto: cot.desconto, iva: cot.iva, total,
-    valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString()
+    valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || ''
   });
   guardarDoc(doc);
   registarSeqDoc(tipo, seqDeNum(num));
@@ -2267,7 +2520,7 @@ function confirmarRecibo() {
     estado: 'Emitido', origem: f.num, facturaId: f.id,
     cliNome: f.cliNome, cliNuit: f.cliNuit, cliEnd: f.cliEnd, cliCidade: f.cliCidade, cliTel: f.cliTel, cliEmail: f.cliEmail,
     items: [], sub: 0, descTipo: 'pct', descValor: 0, desconto: 0, iva: 0, total: valor, valorRecebido: valor,
-    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString()
+    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || ''
   });
   guardarDoc(doc);
   registarSeqDoc('RC', seqDeNum(num));
@@ -2286,6 +2539,7 @@ function previewDoc(idEnc) {
 }
 
 function anularDoc(idEnc) {
+  if (!pode('anular')) { showToast('⛔ Só master/admin podem anular documentos.'); return; }
   const docs = getDocs();
   const d = docs.find(x => x.id === decodeURIComponent(idEnc));
   if (!d || d.estado === 'Anulado') return;
@@ -2329,8 +2583,8 @@ function renderDocList() {
       <div style="min-width:130px"><span class="tag st-${inf.estado}">${inf.estado}</span>${inf.vencida ? ' <span class="tag st-Vencida">Vencida</span>' : ''}${saldoTxt}</div>
       <div class="cot-card-actions">
         <button class="btn btn-success btn-sm" title="Ver / Exportar PDF" onclick="previewDoc('${enc}')">👁️</button>
-        ${d.tipo === 'FT' && !anul && inf.saldo > 0.005 ? `<button class="btn btn-primary btn-sm" onclick="abrirRecibo('${enc}')">💰 Recibo</button>` : ''}
-        ${!anul ? `<button class="btn btn-danger btn-sm" title="Anular" onclick="anularDoc('${enc}')">🚫</button>` : ''}
+        ${pode('emitir') && d.tipo === 'FT' && !anul && inf.saldo > 0.005 ? `<button class="btn btn-primary btn-sm" onclick="abrirRecibo('${enc}')">💰 Recibo</button>` : ''}
+        ${pode('anular') && !anul ? `<button class="btn btn-danger btn-sm" title="Anular" onclick="anularDoc('${enc}')">🚫</button>` : ''}
       </div></div>`;
   }).join('') + '</div>';
 }
@@ -2523,6 +2777,122 @@ function exportarMovimentosCSV() {
   a.download = `movimentos_${gv('res-de') || 'inicio'}_${gv('res-ate') || 'hoje'}_${gv('res-moeda') || 'MT'}.csv`;
   document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UTILIZADORES E PERFIS (Configurações → Utilizadores)
+   ════════════════════════════════════════════════════════════════ */
+let _usuarios = [];
+function rolesQueEuPossoCriar() {
+  if (!SESSAO) return [];
+  return SESSAO.role === 'master' ? ['master','admin','usuario','cotacionario'] : (SESSAO.role === 'admin' ? ['usuario','cotacionario'] : []);
+}
+function possoGerir(roleAlvo) { return rolesQueEuPossoCriar().includes(roleAlvo); }
+
+async function carregarUsuarios() {
+  const wrap = document.getElementById('usr-list');
+  if (!wrap) return;
+  if (SESSAO && SESSAO.legacy) {
+    wrap.innerHTML = '<p style="font-size:12px;color:var(--muted)">Para gerir utilizadores, inicie sessão com o utilizador master (ou crie-o no primeiro acesso).</p>';
+    return;
+  }
+  const r = await dbCall('listUsers', {});
+  if (!r || !r.ok) { wrap.innerHTML = `<p style="font-size:12px;color:var(--red)">${esc((r && r.error) || 'Não foi possível carregar os utilizadores (verifique a ligação e se o Code.gs está actualizado).')}</p>`; return; }
+  _usuarios = r.users || [];
+  renderUsuarios();
+}
+
+function renderUsuarios() {
+  const wrap = document.getElementById('usr-list');
+  if (!_usuarios.length) { wrap.innerHTML = '<p style="font-size:12px;color:var(--muted)">Ainda não há utilizadores.</p>'; return; }
+  const ordem = { master: 0, admin: 1, usuario: 2, cotacionario: 3 };
+  const lista = _usuarios.slice().sort((a, b) => (ordem[a.role] - ordem[b.role]) || a.nome.localeCompare(b.nome));
+  wrap.innerHTML = `<table class="res-table"><thead><tr><th>Nome</th><th>Utilizador</th><th>Perfil</th><th>Estado</th><th>Último acesso</th><th></th></tr></thead><tbody>` +
+    lista.map(u => {
+      const eu = SESSAO && u.username === SESSAO.username;
+      const gerivel = possoGerir(u.role);
+      return `<tr>
+        <td><strong>${esc(u.nome)}</strong>${eu ? ' <span class="tag st-Pago">você</span>' : ''}</td>
+        <td>${esc(u.username)}</td>
+        <td><span class="tag tag-${u.role === 'cotacionario' ? 'RC' : (u.role === 'usuario' ? 'FT' : 'VD')}">${esc((ROLES_INFO[u.role] || {}).nome || u.role)}</span></td>
+        <td>${u.ativo === 'nao' ? '<span class="tag st-Anulado">Desactivado</span>' : '<span class="tag st-Pago">Activo</span>'}</td>
+        <td>${u.ultimoLogin ? esc(String(u.ultimoLogin).slice(0, 16).replace('T', ' ')) : '—'}</td>
+        <td class="r">${gerivel ? `<button class="btn btn-primary btn-sm" onclick="abrirUsuarioModal('${esc(u.id)}')">✏️</button>
+          ${eu ? '' : `<button class="btn btn-danger btn-sm" onclick="apagarUsuario('${esc(u.id)}')">🗑️</button>`}` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+      </tr>`;
+    }).join('') + '</tbody></table>';
+}
+
+function descRolePreview() {
+  const r = gv('usr-role');
+  document.getElementById('usr-role-desc').innerHTML = `<strong>${(ROLES_INFO[r] || {}).nome || ''}:</strong> ${(ROLES_INFO[r] || {}).desc || ''}`;
+}
+
+function abrirUsuarioModal(id) {
+  const u = id ? _usuarios.find(x => x.id === id) : null;
+  const sel = document.getElementById('usr-role');
+  sel.innerHTML = rolesQueEuPossoCriar().map(r => `<option value="${r}">${ROLES_INFO[r].nome}</option>`).join('');
+  sel.onchange = descRolePreview;
+  document.getElementById('usr-titulo').textContent = u ? '✏️ Editar utilizador' : '➕ Novo utilizador';
+  document.getElementById('usr-id').value = u ? u.id : '';
+  document.getElementById('usr-nome').value = u ? u.nome : '';
+  document.getElementById('usr-username').value = u ? u.username : '';
+  document.getElementById('usr-username').disabled = !!u;
+  sel.value = u ? u.role : (rolesQueEuPossoCriar().includes('cotacionario') ? 'cotacionario' : sel.options[0].value);
+  document.getElementById('usr-ativo').value = u ? (u.ativo === 'nao' ? 'nao' : 'sim') : 'sim';
+  document.getElementById('usr-pass').value = '';
+  document.getElementById('usr-pass-label').textContent = u ? 'Nova palavra-passe (deixe vazio para manter)' : 'Palavra-passe (mín. 6 caracteres)';
+  document.getElementById('usr-erro').style.display = 'none';
+  descRolePreview();
+  document.getElementById('modal-usuario').classList.add('open');
+}
+
+async function guardarUsuario() {
+  const erro = document.getElementById('usr-erro');
+  const id = gv('usr-id');
+  const user = { id: id || undefined, nome: gv('usr-nome').trim(), username: gv('usr-username').trim().toLowerCase(),
+                 role: gv('usr-role'), ativo: gv('usr-ativo'), password: document.getElementById('usr-pass').value || undefined };
+  if (!user.nome || !user.username) { erro.textContent = 'Indique o nome e o utilizador.'; erro.style.display = 'block'; return; }
+  if (!id && !user.password) { erro.textContent = 'Indique a palavra-passe.'; erro.style.display = 'block'; return; }
+  const r = await dbCall('saveUser', { user });
+  if (!r || !r.ok) { erro.textContent = (r && r.error) || 'Não foi possível guardar (sem ligação?).'; erro.style.display = 'block'; return; }
+  fecharModal();
+  showToast('✅ Utilizador guardado.');
+  carregarUsuarios();
+}
+
+async function apagarUsuario(id) {
+  const u = _usuarios.find(x => x.id === id);
+  if (!u || !confirm(`Apagar o utilizador "${u.nome}" (${u.username})?\nAs cotações e documentos que criou mantêm-se.`)) return;
+  const r = await dbCall('deleteUser', { id });
+  if (!r || !r.ok) { showToast('⚠️ ' + ((r && r.error) || 'Não foi possível apagar.')); return; }
+  showToast('🗑️ Utilizador apagado.');
+  carregarUsuarios();
+}
+
+/* ────────── A minha conta */
+function abrirMinhaConta() {
+  if (!SESSAO) return;
+  document.getElementById('conta-info').innerHTML = `<strong>${esc(SESSAO.nome || SESSAO.username)}</strong> (${esc(SESSAO.username)}) · Perfil: <strong>${esc((ROLES_INFO[SESSAO.role] || {}).nome || SESSAO.role)}</strong><br><span style="font-size:11px">${esc((ROLES_INFO[SESSAO.role] || {}).desc || '')}</span>`;
+  const comSenha = !!SESSAO.token;
+  document.getElementById('conta-senha-box').style.display = comSenha ? '' : 'none';
+  document.getElementById('conta-btn').style.display = comSenha ? '' : 'none';
+  ['conta-atual','conta-nova','conta-nova2'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('conta-erro').style.display = 'none';
+  document.getElementById('modal-conta').classList.add('open');
+}
+async function alterarMinhaSenha() {
+  const erro = document.getElementById('conta-erro');
+  const atual = document.getElementById('conta-atual').value, n1 = document.getElementById('conta-nova').value, n2 = document.getElementById('conta-nova2').value;
+  const falha = m => { erro.textContent = m; erro.style.display = 'block'; };
+  if (!atual) return falha('Indique a palavra-passe actual.');
+  if (n1.length < 6) return falha('A nova palavra-passe deve ter pelo menos 6 caracteres.');
+  if (n1 !== n2) return falha('As palavras-passe novas não coincidem.');
+  const r = await dbCall('changePassword', { atual, nova: n1 });
+  if (!r || !r.ok) return falha((r && r.error) || 'Não foi possível alterar (sem ligação?).');
+  guardarVerificadorOffline(SESSAO.username, n1, SESSAO);
+  fecharModal();
+  showToast('🔑 Palavra-passe alterada.');
 }
 
 /* ────────── START */
