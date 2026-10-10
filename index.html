@@ -150,6 +150,7 @@ textarea{resize:vertical;min-height:58px}
 .doc-card{flex-wrap:wrap}
 .doc-card.anulado{opacity:.55}
 .doc-card.anulado .cot-card-total{text-decoration:line-through}
+[hidden]{display:none!important}
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .kpi{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;box-shadow:var(--shadow)}
 .kpi .k-l{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
@@ -209,13 +210,13 @@ body.locked{overflow:hidden}
 
 <!-- TABS -->
 <div class="tabs no-print">
-  <div class="tab active" onclick="irParaNovaCotacao()">📄 Nova Cotação</div>
-  <div class="tab" onclick="switchTab('guardadas')">🗂️ Cotações Guardadas</div>
-  <div class="tab" onclick="switchTab('documentos')">🧾 Documentos</div>
-  <div class="tab" onclick="switchTab('resumos')">📊 Resumos</div>
-  <div class="tab" onclick="switchTab('produtos')">📦 Produtos</div>
-  <div class="tab" onclick="switchTab('preview')">👁️ Pré-visualizar</div>
-  <div class="tab" onclick="abrirConfigComPin()">⚙️ Configurações</div>
+  <div class="tab active" data-tab="cotacao" hidden onclick="irParaNovaCotacao()">📄 Nova Cotação</div>
+  <div class="tab" data-tab="guardadas" hidden onclick="switchTab('guardadas')">🗂️ Cotações Guardadas</div>
+  <div class="tab" data-tab="documentos" hidden onclick="switchTab('documentos')">🧾 Documentos</div>
+  <div class="tab" data-tab="resumos" hidden onclick="switchTab('resumos')">📊 Resumos</div>
+  <div class="tab" data-tab="produtos" hidden onclick="switchTab('produtos')">📦 Produtos</div>
+  <div class="tab" data-tab="preview" hidden onclick="switchTab('preview')">👁️ Pré-visualizar</div>
+  <div class="tab" data-tab="config" hidden onclick="abrirConfigComPin()">⚙️ Configurações</div>
   <div class="tab" id="user-chip" onclick="abrirMinhaConta()" title="A minha conta" style="margin-left:auto;flex:0;white-space:nowrap">👤</div>
   <div class="tab" onclick="terminarSessao()" style="flex:0">🚪 Sair</div>
 </div>
@@ -392,8 +393,8 @@ body.locked{overflow:hidden}
   <div class="card" id="card-utilizadores" data-perm="utilizadores">
     <div class="card-title">👥 Utilizadores e Perfis de Acesso</div>
     <div class="alert alert-info" style="font-size:12px;line-height:1.7">
-      <strong>Master</strong> — acesso total, Base de Dados e todos os utilizadores.<br>
-      <strong>Admin</strong> — tudo (cotações, facturação, resumos, configurações da empresa) e gere Usuários e Cotacionários.<br>
+      <strong>Master</strong> — acesso total; é o <u>único</u> com acesso às Configurações (empresa, Base de Dados e utilizadores).<br>
+      <strong>Admin</strong> — cotações, facturação, resumos, produtos, anular documentos e apagar cotações; <u>sem</u> Configurações.<br>
       <strong>Usuário</strong> — cotações, facturas/VD/recibos e produtos; sem resumos, configurações, anular nem apagar cotações.<br>
       <strong>Cotacionário</strong> — só cria e edita as <u>suas</u> cotações.
     </div>
@@ -677,15 +678,15 @@ let _bootCred = null;       // credenciais de 1.º acesso usadas para criar o ma
 
 /* ────────── PERFIS E PERMISSÕES (a verdadeira protecção está no servidor) */
 const ROLES_INFO = {
-  master:       { nome: 'Master',       desc: 'Acesso total, incluindo Base de Dados e todos os utilizadores.' },
-  admin:        { nome: 'Admin',        desc: 'Tudo (cotações, facturação, resumos, configurações da empresa) e gere Usuários e Cotacionários. Sem acesso à Base de Dados.' },
+  master:       { nome: 'Master',       desc: 'Acesso total. É o único com acesso às Configurações (empresa, Base de Dados e utilizadores).' },
+  admin:        { nome: 'Admin',        desc: 'Cotações, facturação, resumos, produtos, anular documentos e apagar cotações. Sem acesso às Configurações (só o Master).' },
   usuario:      { nome: 'Usuário',      desc: 'Cotações, facturas/VD/recibos e produtos. Sem resumos, configurações, anular documentos nem apagar cotações.' },
   cotacionario: { nome: 'Cotacionário', desc: 'Só cria, edita e pré-visualiza as suas próprias cotações.' }
 };
 const TABS_ORDEM = ['cotacao','guardadas','documentos','resumos','produtos','preview','config'];
 const PERMS = {
   master:       { tabs: TABS_ORDEM, emitir: 1, anular: 1, apagarCot: 1, apagarTudo: 1, db: 1, utilizadores: 1, todasCot: 1, produtos: 1 },
-  admin:        { tabs: TABS_ORDEM, emitir: 1, anular: 1, apagarCot: 1, utilizadores: 1, todasCot: 1, produtos: 1 },
+  admin:        { tabs: ['cotacao','guardadas','documentos','resumos','produtos','preview'], emitir: 1, anular: 1, apagarCot: 1, todasCot: 1, produtos: 1 },
   usuario:      { tabs: ['cotacao','guardadas','documentos','produtos','preview'], emitir: 1, todasCot: 1, produtos: 1 },
   cotacionario: { tabs: ['cotacao','guardadas','preview'] }
 };
@@ -694,9 +695,10 @@ function podeVer(t) { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P.t
 function painelActivo() { const el = document.querySelector('.panel.active'); return el ? el.id.replace('tab-', '') : 'cotacao'; }
 
 function aplicarPermissoes() {
-  const tabs = document.querySelectorAll('.tab');
-  TABS_ORDEM.forEach((id, i) => { if (tabs[i]) tabs[i].style.display = podeVer(id) ? '' : 'none'; });
-  document.querySelectorAll('[data-perm]').forEach(el => { el.style.display = pode(el.dataset.perm) ? '' : 'none'; });
+  // Separadores e painéis a que o perfil NÃO tem acesso ficam escondidos (não aparecem).
+  document.querySelectorAll('.tab[data-tab]').forEach(t => { t.hidden = !podeVer(t.dataset.tab); });
+  TABS_ORDEM.forEach(id => { const p = document.getElementById('tab-' + id); if (p) p.hidden = !podeVer(id); });
+  document.querySelectorAll('[data-perm]').forEach(el => { el.hidden = !pode(el.dataset.perm); });
   const chip = document.getElementById('user-chip');
   if (chip) chip.textContent = SESSAO ? `👤 ${SESSAO.nome || SESSAO.username} · ${(ROLES_INFO[SESSAO.role] || {}).nome || SESSAO.role}` : '👤';
   if (SESSAO && !podeVer(painelActivo())) switchTab('cotacao');
@@ -801,6 +803,8 @@ async function confirmarLogin() {
 
 function mostrarLogin(msg) {
   SESSAO = null;
+  document.querySelectorAll('.tab[data-tab]').forEach(t => { t.hidden = true; });
+  document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
   sessionStorage.removeItem('sessao');
   document.getElementById('login-screen').classList.remove('hidden');
   document.body.classList.add('locked');
@@ -835,6 +839,7 @@ function verificarSessao() {
   } else {
     document.getElementById('login-screen').classList.remove('hidden');
     document.body.classList.add('locked');
+    document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
     setTimeout(() => document.getElementById('login-user').focus(), 50);
   }
 }
@@ -2785,7 +2790,7 @@ function exportarMovimentosCSV() {
 let _usuarios = [];
 function rolesQueEuPossoCriar() {
   if (!SESSAO) return [];
-  return SESSAO.role === 'master' ? ['master','admin','usuario','cotacionario'] : (SESSAO.role === 'admin' ? ['usuario','cotacionario'] : []);
+  return SESSAO.role === 'master' ? ['master','admin','usuario','cotacionario'] : [];
 }
 function possoGerir(roleAlvo) { return rolesQueEuPossoCriar().includes(roleAlvo); }
 
