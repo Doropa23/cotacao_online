@@ -99,7 +99,7 @@ textarea{resize:vertical;min-height:58px}
 .cot-card-cli{font-size:13px;font-weight:600;flex:1}
 .cot-card-meta{font-size:11px;color:var(--muted);min-width:100px;text-align:right}
 .cot-card-total{font-size:13px;font-weight:700;color:var(--green);min-width:110px;text-align:right}
-.cot-card-actions{display:flex;gap:6px}
+.cot-card-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
 .empty-state{text-align:center;padding:40px 20px;color:var(--muted)}
 .empty-state .big{font-size:40px;margin-bottom:10px}
 
@@ -139,6 +139,31 @@ textarea{resize:vertical;min-height:58px}
 .cot-doc th.r,.cot-doc td.r{text-align:right}
 .cot-doc td{padding:5px 7px;border-bottom:1px solid #eee;font-size:11px;vertical-align:middle}
 .cot-doc tr:nth-child(even) td{background:#f9fbff}
+
+/* DOCUMENTOS / RESUMOS */
+.tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;padding:2px 8px;border-radius:10px;white-space:nowrap}
+.tag-FT{background:#e8f0fb;color:#1a4fa0}.tag-VD{background:#e8f8ef;color:#0d6e3f}.tag-RC{background:#fff4e0;color:#b45309}
+.st-Pendente{background:#fff4e0;color:#b45309}.st-Parcial{background:#fef3c7;color:#92400e}.st-Paga,.st-Pago,.st-Recebido{background:#e8f8ef;color:#0d6e3f}
+.st-Vencida{background:#fdecea;color:#b3261e}.st-Anulado{background:#eee;color:#666}
+.doc-filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.doc-filtros input,.doc-filtros select{padding:7px 10px;font-size:12.5px}
+.doc-card{flex-wrap:wrap}
+.doc-card.anulado{opacity:.55}
+.doc-card.anulado .cot-card-total{text-decoration:line-through}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+.kpi{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;box-shadow:var(--shadow)}
+.kpi .k-l{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.kpi .k-v{font-size:17px;font-weight:700;margin-top:4px;color:var(--text)}
+.kpi .k-s{font-size:11px;color:var(--muted);margin-top:2px}
+.kpi.g .k-v{color:var(--green)}.kpi.b .k-v{color:var(--blue)}.kpi.r .k-v{color:var(--red)}
+.res-wrap{overflow-x:auto}
+.res-table{width:100%;border-collapse:collapse;font-size:12px;background:var(--white)}
+.res-table th{background:#eef2fc;color:var(--blue);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;padding:7px 9px;text-align:left;white-space:nowrap}
+.res-table td{padding:6px 9px;border-top:1px solid #eee;white-space:nowrap}
+.res-table th.r,.res-table td.r{text-align:right}
+.res-table tr.tot td{font-weight:700;background:#f9fbff;border-top:2px solid var(--border)}
+.res-table tr.anul td{color:#999;text-decoration:line-through}
+@media(max-width:800px){.kpi-grid{grid-template-columns:1fr 1fr}}
 
 /* MODAL */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center}
@@ -186,6 +211,8 @@ body.locked{overflow:hidden}
 <div class="tabs no-print">
   <div class="tab active" onclick="irParaNovaCotacao()">📄 Nova Cotação</div>
   <div class="tab" onclick="switchTab('guardadas')">🗂️ Cotações Guardadas</div>
+  <div class="tab" onclick="switchTab('documentos')">🧾 Documentos</div>
+  <div class="tab" onclick="switchTab('resumos')">📊 Resumos</div>
   <div class="tab" onclick="switchTab('produtos')">📦 Produtos</div>
   <div class="tab" onclick="switchTab('preview')">👁️ Pré-visualizar</div>
   <div class="tab" onclick="abrirConfigComPin()">⚙️ Configurações</div>
@@ -279,6 +306,8 @@ body.locked{overflow:hidden}
     <button class="btn btn-primary" onclick="switchTab('preview');gerarPreview()">👁️ Pré-visualizar</button>
     <button class="btn btn-success" onclick="exportarPDF()">⬇️ Exportar PDF</button>
     <button class="btn btn-secondary" onclick="guardarCotacao()">💾 Guardar Cotação</button>
+    <button class="btn btn-warning" onclick="abrirEmitir('FT','__form__')" title="Gera uma Factura com os dados desta cotação">🧾 Gerar Factura</button>
+    <button class="btn btn-warning" onclick="abrirEmitir('VD','__form__')" title="Gera uma Venda a Dinheiro com os dados desta cotação">💵 Venda a Dinheiro</button>
     <button class="btn btn-secondary" onclick="limparForm()">🗑️ Nova / Limpar</button>
   </div>
 </div>
@@ -293,6 +322,48 @@ body.locked{overflow:hidden}
     </div>
   </div>
   <div id="cot-list-wrap"></div>
+</div>
+
+<!-- ══════════════════════════════════ TAB: DOCUMENTOS (Facturas · VD · Recibos) -->
+<div class="panel" id="tab-documentos">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+    <h2 style="font-size:16px;font-weight:700">Facturas · Vendas a Dinheiro · Recibos</h2>
+    <div style="font-size:12px;color:var(--muted)">Para criar: abra uma cotação e use <strong>🧾 Facturar</strong> / <strong>💵 VD</strong>. O recibo cria-se a partir da factura.</div>
+  </div>
+  <div class="doc-filtros">
+    <input type="text" id="doc-q" placeholder="🔍 Pesquisar nº ou cliente..." oninput="renderDocList()" style="min-width:210px">
+    <select id="doc-f-tipo" onchange="renderDocList()">
+      <option value="">Todos os tipos</option><option value="FT">Facturas</option><option value="VD">Vendas a Dinheiro</option><option value="RC">Recibos</option>
+    </select>
+    <select id="doc-f-estado" onchange="renderDocList()">
+      <option value="">Todos os estados</option><option>Pendente</option><option>Parcial</option><option>Paga</option><option>Vencida</option><option>Anulado</option>
+    </select>
+  </div>
+  <div id="doc-list-wrap"></div>
+</div>
+
+<!-- ══════════════════════════════════ TAB: RESUMOS -->
+<div class="panel" id="tab-resumos">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+    <h2 style="font-size:16px;font-weight:700">📊 Resumo de Movimentos, IVA e Facturação</h2>
+    <button class="btn btn-secondary btn-sm" onclick="exportarMovimentosCSV()">⬇️ Exportar movimentos (CSV/Excel)</button>
+  </div>
+  <div class="doc-filtros">
+    <div class="field"><label>De</label><input type="date" id="res-de" onchange="renderResumos()"></div>
+    <div class="field"><label>Até</label><input type="date" id="res-ate" onchange="renderResumos()"></div>
+    <div class="field"><label>Moeda</label>
+      <select id="res-moeda" onchange="renderResumos()"><option value="MT">MT</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="ZAR">ZAR</option></select>
+    </div>
+    <div class="field"><label>Atalhos</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="periodoRapido('mes')">Este mês</button>
+        <button class="btn btn-secondary btn-sm" onclick="periodoRapido('mesant')">Mês anterior</button>
+        <button class="btn btn-secondary btn-sm" onclick="periodoRapido('ano')">Este ano</button>
+        <button class="btn btn-secondary btn-sm" onclick="periodoRapido('tudo')">Tudo</button>
+      </div>
+    </div>
+  </div>
+  <div id="res-wrap"></div>
 </div>
 
 <!-- ══════════════════════════════════ TAB: PRODUTOS -->
@@ -367,6 +438,9 @@ body.locked{overflow:hidden}
     <div class="form-grid">
       <div class="field"><label>Cor Principal</label><input type="color" id="cfg-cor" value="#1a4fa0" style="height:38px;cursor:pointer"></div>
       <div class="field"><label>Prefixo Numeração</label><input type="text" id="cfg-prefix" placeholder="COT- ou deixar vazio"></div>
+      <div class="field"><label>Prefixo Facturas</label><input type="text" id="cfg-prefix-ft" placeholder="FT "></div>
+      <div class="field"><label>Prefixo Vendas a Dinheiro</label><input type="text" id="cfg-prefix-vd" placeholder="VD "></div>
+      <div class="field"><label>Prefixo Recibos</label><input type="text" id="cfg-prefix-rc" placeholder="RC "></div>
       <div class="field"><label>Altura do logotipo nas páginas seguintes (mm)</label><input type="number" id="cfg-logo2" min="6" max="25" value="12"></div>
     </div>
   </div>
@@ -444,6 +518,48 @@ body.locked{overflow:hidden}
     <div class="alert alert-success" id="guardar-info" style="display:none"></div>
     <div class="btn-bar">
       <button class="btn btn-primary" onclick="confirmarGuardar()">Guardar</button>
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ MODAL: EMITIR FACTURA / VD -->
+<div class="modal-bg" id="modal-emitir">
+  <div class="modal">
+    <h3 id="em-titulo">🧾 Emitir Factura</h3>
+    <div class="alert alert-info" id="em-info" style="font-size:12px"></div>
+    <div class="form-grid" style="gap:10px">
+      <div class="field"><label>Nº do Documento</label><input type="text" id="em-num"></div>
+      <div class="field"><label>Data</label><input type="date" id="em-data"></div>
+      <div class="field" id="em-venc-wrap"><label>Vencimento</label><input type="date" id="em-venc"></div>
+      <div class="field" id="em-metodo-wrap"><label>Método de Pagamento</label>
+        <select id="em-metodo"><option>Numerário</option><option>M-Pesa</option><option>e-Mola</option><option>mKesh</option><option>POS / Cartão</option><option>Transferência Bancária</option><option>Cheque</option></select>
+      </div>
+      <div class="field s2"><label>Observações (opcional)</label><textarea id="em-obs" rows="2"></textarea></div>
+    </div>
+    <div class="btn-bar">
+      <button class="btn btn-primary" onclick="confirmarEmitir()">✅ Emitir</button>
+      <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════ MODAL: RECIBO -->
+<div class="modal-bg" id="modal-recibo">
+  <div class="modal">
+    <h3>💰 Emitir Recibo</h3>
+    <div class="alert alert-info" id="rc-info" style="font-size:12px"></div>
+    <div class="form-grid" style="gap:10px">
+      <div class="field"><label>Nº do Recibo</label><input type="text" id="rc-num"></div>
+      <div class="field"><label>Data do Pagamento</label><input type="date" id="rc-data"></div>
+      <div class="field"><label>Valor Recebido</label><input type="number" id="rc-valor" min="0" step="0.01"></div>
+      <div class="field"><label>Método de Pagamento</label>
+        <select id="rc-metodo"><option>Numerário</option><option>M-Pesa</option><option>e-Mola</option><option>mKesh</option><option>POS / Cartão</option><option>Transferência Bancária</option><option>Cheque</option></select>
+      </div>
+      <div class="field s2"><label>Observações / Referência do pagamento (opcional)</label><textarea id="rc-obs" rows="2" placeholder="Ex.: Ref. transferência 12345"></textarea></div>
+    </div>
+    <div class="btn-bar">
+      <button class="btn btn-primary" onclick="confirmarRecibo()">✅ Emitir Recibo</button>
       <button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button>
     </div>
   </div>
@@ -616,7 +732,7 @@ async function sincronizarTudo() {
   // Config da empresa
   if (r.config) {
     Object.keys(r.config).forEach(k => {
-      if (k === 'cotSeq') return;   // tratado abaixo: fica sempre o MAIOR valor
+      if (['cotSeq','ftSeq','vdSeq','rcSeq'].includes(k)) return;   // tratados abaixo: fica sempre o MAIOR valor
       if (r.config[k] !== '' && r.config[k] != null) localStorage.setItem(k, r.config[k]);
     });
     carregarConfig();
@@ -639,6 +755,16 @@ async function sincronizarTudo() {
     }));
     localStorage.setItem('cotacoes', JSON.stringify(cots));
   }
+  // Documentos (Facturas · VD · Recibos)
+  if (Array.isArray(r.documentos)) mesclarDocumentos(r.documentos);
+  ['FT','VD','RC'].forEach(t => {
+    const k = TIPOS_DOC[t].seq;
+    const rem = parseInt((r.config && r.config[k]) || 0) || 0;
+    const fin = Math.max(rem, seqMaximoDoc(t));
+    if (fin > (parseInt(localStorage.getItem(k) || 0) || 0)) localStorage.setItem(k, fin);
+    if (fin > rem) dbCall('saveConfig', { config: { [k]: String(fin) } });
+  });
+
   // Numeração: fica o maior entre o contador local, o da Base de Dados e as cotações existentes
   const seqRemoto = parseInt((r.config && r.config.cotSeq) || 0) || 0;
   const seqFinal = Math.max(seqRemoto, seqMaximo());
@@ -655,6 +781,8 @@ async function sincronizarTudo() {
   if (ativo) {
     if (document.getElementById('tab-guardadas').classList.contains('active')) renderCotList();
     if (document.getElementById('tab-produtos').classList.contains('active')) renderProdList();
+    if (document.getElementById('tab-documentos').classList.contains('active')) renderDocList();
+    if (document.getElementById('tab-resumos').classList.contains('active')) renderResumos();
   }
 }
 
@@ -803,11 +931,14 @@ function autoNum() {
 function switchTab(id) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  const map = {cotacao:0, guardadas:1, produtos:2, preview:3, config:4};
+  const map = {cotacao:0, guardadas:1, documentos:2, resumos:3, produtos:4, preview:5, config:6};
   document.querySelectorAll('.tab')[map[id]].classList.add('active');
   document.getElementById('tab-'+id).classList.add('active');
   if (id==='preview') gerarPreview();
+  if (id!=='preview') _docPreview = null;
   if (id==='guardadas') renderCotList();
+  if (id==='documentos') renderDocList();
+  if (id==='resumos') iniciarResumos();
   if (id==='produtos') renderProdList();
 }
 
@@ -942,7 +1073,7 @@ function calcTotaisComDesconto() {
 
 /* ────────── CONFIG */
 function salvarConfig() {
-  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape','cfg-logo2']
+  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-prefix-ft','cfg-prefix-vd','cfg-prefix-rc','cfg-rodape','cfg-logo2']
     .forEach(f => localStorage.setItem(f, document.getElementById(f).value));
   localStorage.setItem('cfg-cor', document.getElementById('cfg-cor').value);
   if (logoData) localStorage.setItem('logoData', logoData);
@@ -955,7 +1086,7 @@ function salvarConfig() {
 
   if (temDB()) {
     const cfg = {};
-    ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape','cfg-cor','cfg-logo2']
+    ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-prefix-ft','cfg-prefix-vd','cfg-prefix-rc','cfg-rodape','cfg-cor','cfg-logo2']
       .forEach(f => cfg[f] = gv(f));
     if (logoData) cfg.logoData = logoData;
     dbCall('saveConfig', { config: cfg }).then(r => {
@@ -965,7 +1096,7 @@ function salvarConfig() {
 }
 
 function carregarConfig() {
-  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape','cfg-logo2']
+  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-prefix-ft','cfg-prefix-vd','cfg-prefix-rc','cfg-rodape','cfg-logo2']
     .forEach(f => { const v=localStorage.getItem(f); if(v && document.getElementById(f)) document.getElementById(f).value=v; });
   const cor = localStorage.getItem('cfg-cor');
   if (cor) document.getElementById('cfg-cor').value = cor;
@@ -1367,6 +1498,9 @@ function renderCotList() {
       <div class="cot-card-meta">${fmtDate(c.data)}</div>
       <div class="cot-card-total">${fmt(c.total)} ${c.moeda}</div>
       <div class="cot-card-actions">
+        ${badgeFacturada(c.num)}
+        <button class="btn btn-warning btn-sm" title="Gerar Factura desta cotação" onclick="abrirEmitir('FT','${esc(c.num)}')">🧾 Facturar</button>
+        <button class="btn btn-warning btn-sm" title="Gerar Venda a Dinheiro desta cotação" onclick="abrirEmitir('VD','${esc(c.num)}')">💵 VD</button>
         <button class="btn btn-primary btn-sm" onclick="carregarCotacao('${esc(c.num)}')">✏️ Editar</button>
         <button class="btn btn-success btn-sm" onclick="previewCotacao('${esc(c.num)}')">👁️</button>
         <button class="btn btn-danger btn-sm" onclick="apagarCotacao('${esc(c.num)}')">🗑️</button>
@@ -1448,12 +1582,16 @@ function limparPreview() {
 }
 
 /* ────────── BUILD DOCUMENT */
+let _docPreview = null;   // quando preenchido, a Pré-visualização mostra este documento (FT/VD/RC) em vez do formulário
 function gerarPreview() {
-  document.getElementById('cot-preview').innerHTML = buildDoc();
+  document.getElementById('cot-preview').innerHTML = buildDoc(_docPreview || undefined);
 
 }
 
-function buildDoc() {
+function buildDoc(d) {
+  d = d || dadosDoForm();
+  if (d.tipo === 'RC') return buildRecibo(d);
+  const T = TIPOS_DOC[d.tipo || 'COT'];
   const cor      = document.getElementById('cfg-cor').value || '#1a4fa0';
   const empNome  = lsv('emp-nome')  || 'Empresa Emissora';
   const empNuit  = lsv('emp-nuit');
@@ -1462,27 +1600,28 @@ function buildDoc() {
   const empEmail = lsv('emp-email');
   const empCidade= lsv('emp-cidade');
 
-  const cliNome  = gv('cli-nome') || '—';
-  const cliNuit  = gv('cli-nuit');
-  const cliEnd   = gv('cli-end');
-  const cliCidade= gv('cli-cidade');
-  const cliTel   = gv('cli-tel');
-  const cliEmail = gv('cli-email');
+  const cliNome  = d.cliNome || '—';
+  const cliNuit  = d.cliNuit || '';
+  const cliEnd   = d.cliEnd || '';
+  const cliCidade= d.cliCidade || '';
+  const cliTel   = d.cliTel || '';
+  const cliEmail = d.cliEmail || '';
 
-  const cotNum   = gv('cot-num');
-  const cotData  = fmtDate(gv('cot-data'));
-  const cotVenc  = fmtDate(gv('cot-venc'));
-  const cotCond  = gv('cot-cond') || 'Pronto Pagamento';
-  const cotTempo = gv('cot-tempo') || 'Entrega imediata';
-  const cotVal   = gv('cot-validade') || '15';
-  const moeda    = gv('cot-moeda') || 'MT';
+  const cotNum   = d.num || '';
+  const cotData  = fmtDate(d.data);
+  const cotVenc  = fmtDate(d.venc);
+  const cotCond  = d.cond || 'Pronto Pagamento';
+  const cotTempo = d.tempo || 'Entrega imediata';
+  const cotVal   = d.validade || '15';
+  const moeda    = d.moeda || 'MT';
   const rodape   = lsv('cfg-rodape') || 'Documento Processado por Computador';
-  const cotObs   = gv('cot-obs').trim();
+  const cotObs   = String(d.obs || '').trim();
+  const itens    = d.items || [];
 
   let sub=0, ivaBruto=0;
-  items.forEach(it=>{ const b=calcLiq(it); sub+=b; ivaBruto+=b*(it.iva/100); });
-  const descTipo  = gv('cot-desc-tipo') || 'pct';
-  const descValor = parseFloat(gv('cot-desc-valor')) || 0;
+  itens.forEach(it=>{ const b=calcLiq(it); sub+=b; ivaBruto+=b*(it.iva/100); });
+  const descTipo  = d.descTipo || 'pct';
+  const descValor = parseFloat(d.descValor) || 0;
   let desconto = descTipo === 'pct' ? sub * (descValor/100) : descValor;
   if (desconto < 0) desconto = 0;
   if (desconto > sub) desconto = sub;
@@ -1501,7 +1640,7 @@ function buildDoc() {
   const cliInfo = [cliEnd, cliCidade, cliTel?'Tel: '+cliTel:'', cliEmail, cliNuit?'NUIT: '+cliNuit:'']
     .filter(Boolean).map(s=>`<div>${esc(s)}</div>`).join('');
 
-  const rowsArr = items.map((it,i)=>`
+  const rowsArr = itens.map((it,i)=>`
     <tr>
       <td>${String(i+1).padStart(2,'0')}</td>
       <td>${esc(it.ref)||'—'}</td>
@@ -1515,15 +1654,32 @@ function buildDoc() {
 
   const extensoHTML = valorPorExtenso(total, moeda);
 
+  // ── Conteúdo que muda conforme o tipo de documento ──
+  const tp = d.tipo || 'COT';
+  const par = (l, v) => `<div><span style="color:#555">${l}: </span><span style="font-weight:600">${v}</span></div>`;
+  let metaBase, condTitulo = 'Condições', condHTML;
+  if (tp === 'FT') {
+    metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Data',cotData],['Vencimento',cotVenc],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
+    condTitulo = 'Dados da Factura';
+    condHTML = par('Cond. de pagamento', esc(cotCond)) + par('Vencimento', cotVenc) + par('Ref. cotação', esc(d.origem||'—'));
+  } else if (tp === 'VD') {
+    metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Data',cotData],['Pagamento',esc(d.metodo||'—')],['Ref. Cotação',esc(d.origem||'—')],['Moeda',moeda]];
+    condTitulo = 'Dados do Pagamento';
+    condHTML = par('Método de pagamento', esc(d.metodo||'—')) + par('Valor recebido', fmt(total)+' '+moeda) + par('Ref. cotação', esc(d.origem||'—'));
+  } else {
+    metaBase = [['Nº Contrib.',empNuit||'—'],['Vencimento',cotVenc],['Validade',cotVal+' dias'],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
+    condHTML = par('Tempo de execução', esc(cotTempo)) + par('Validade da cotação', cotVal+' dias') + par('Cond. de pagamento', esc(cotCond));
+  }
+
   // ── Blocos do documento ──
   const htmlTopo   = `  <!-- CABEÇALHO -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5mm;padding-bottom:4mm;border-bottom:2.5px solid ${cor}">
     <div>${logoHTML}</div>
     <div style="text-align:right">
-      <div style="font-size:24px;font-weight:700;color:${cor};letter-spacing:2px">COTAÇÃO</div>
+      <div style="font-size:${T.titulo.length>10?18:24}px;font-weight:700;color:${cor};letter-spacing:2px">${T.titulo}</div>
       <div style="font-size:14px;font-weight:700;color:${cor};margin-top:2px">Nº ${esc(cotNum)}</div>
       <div style="font-size:10px;color:#555;margin-top:3px">${cotData}</div>
-      <div style="font-size:9px;background:${cor};color:#fff;padding:2px 9px;border-radius:3px;display:inline-block;margin-top:5px">Original</div>
+      <div style="font-size:9px;background:${d.estado==='Anulado'?'#c0392b':cor};color:#fff;padding:2px 9px;border-radius:3px;display:inline-block;margin-top:5px">${d.estado==='Anulado'?'ANULADO':'Original'}</div>
     </div>
   </div>
 
@@ -1541,7 +1697,7 @@ function buildDoc() {
 
   <!-- META GRID -->
   <div style="display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #d0d5dd;border-radius:4px;overflow:hidden;margin-bottom:4mm;font-size:10px">
-    ${[['Nº Contrib.',empNuit||'—'],['Vencimento',cotVenc],['Validade',cotVal+' dias'],['Cond. Pagamento',cotCond],['Moeda',moeda]]
+    ${metaBase
       .map(([l,v],i)=>`<div style="padding:4px 7px${i<4?';border-right:1px solid #d0d5dd':''}">
         <span style="font-size:7.5px;font-weight:700;color:${cor};text-transform:uppercase;display:block;margin-bottom:1px">${l}</span>
         <span style="font-weight:600">${v}</span></div>`).join('')}
@@ -1575,11 +1731,9 @@ function buildDoc() {
 
   <!-- CONDIÇÕES -->
   <div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm;font-size:10px">
-    <div style="font-size:8px;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px">Condições</div>
+    <div style="font-size:8px;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px">${condTitulo}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
-      <div><span style="color:#555">Tempo de execução: </span><span style="font-weight:600">${esc(cotTempo)}</span></div>
-      <div><span style="color:#555">Validade da cotação: </span><span style="font-weight:600">${cotVal} dias</span></div>
-      <div><span style="color:#555">Cond. de pagamento: </span><span style="font-weight:600">${esc(cotCond)}</span></div>
+      ${condHTML}
     </div>
   </div>
 ${cotObs ? `
@@ -1608,7 +1762,7 @@ ${cotObs ? `
     const logo = logoData
       ? `<div style="height:${logo2H}mm;display:flex;justify-content:center;align-items:center"><img src="${logoData}" style="max-height:${logo2H}mm;max-width:50mm;object-fit:contain;display:block"></div>`
       : `<div style="text-align:center;font-weight:700;font-size:12px;letter-spacing:1px;color:${cor}">${esc(empNome)}</div>`;
-    return `${logo}<div style="text-align:center;font-size:9.5px;color:#555;margin:2mm 0 0">Cotação Nº <strong style="color:${cor}">${esc(cotNum)}</strong></div><div style="height:30mm"></div>`;
+    return `${logo}<div style="text-align:center;font-size:9.5px;color:#555;margin:2mm 0 0">${T.nome} Nº <strong style="color:${cor}">${esc(cotNum)}</strong></div><div style="height:30mm"></div>`;
   };
   const tabHTML = (linhas) => `<table style="margin-bottom:4mm">${theadHTML}<tbody>${linhas}</tbody></table>`;
 
@@ -1719,12 +1873,13 @@ function numExtenso(n) {
    à pré-visualização, sem rasterizar nada) */
 function exportarPDF() {
   gerarPreview();
-  const docHTML = buildDoc();
-  const num = (gv('cot-num') || 'cotacao').replace(/[\/\\?%*:|"<>]/g, '-');
-  const cliente = (gv('cli-nome') || 'Cliente').trim()
+  const dAtual = _docPreview || dadosDoForm();
+  const docHTML = buildDoc(dAtual);
+  const num = (dAtual.num || 'cotacao').replace(/[\/\\?%*:|"<>]/g, '-');
+  const cliente = (dAtual.cliNome || 'Cliente').trim()
     .replace(/[\/\\?%*:|"<>]/g, '-')
     .replace(/\s+/g, '_');
-  const nomeFicheiro = `Cotacao_${cliente}_${num}`;
+  const nomeFicheiro = `${TIPOS_DOC[dAtual.tipo || 'COT'].nome.replace(/\s+/g,'')}_${cliente}_${num}`;
 
   // CSS necessário para o documento (extraído das regras .cot-doc do ficheiro)
   const docCSS = `
@@ -1842,6 +1997,487 @@ function showToast(msg) {
   t.textContent=msg; t.style.opacity='1';
   clearTimeout(t._t);
   t._t=setTimeout(()=>{ t.style.opacity='0'; }, 3000);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DOCUMENTOS: FACTURA (FT) · VENDA A DINHEIRO (VD) · RECIBO (RC)
+   ────────────────────────────────────────────────────────────────
+   • FT e VD nascem de uma cotação (guardada ou do formulário).
+   • RC nasce de uma FT (total ou parcial) — o saldo da factura é
+     sempre calculado a partir dos recibos não anulados.
+   • Cada tipo tem a sua própria numeração sequencial (nunca recua).
+   • Documentos emitidos não se editam: anulam-se (ficam registados).
+   ════════════════════════════════════════════════════════════════ */
+const TIPOS_DOC = {
+  COT: { nome: 'Cotação',          titulo: 'COTAÇÃO' },
+  FT:  { nome: 'Factura',          titulo: 'FACTURA',          pref: 'FT ', seq: 'ftSeq', cfg: 'cfg-prefix-ft' },
+  VD:  { nome: 'Venda a Dinheiro', titulo: 'VENDA A DINHEIRO', pref: 'VD ', seq: 'vdSeq', cfg: 'cfg-prefix-vd' },
+  RC:  { nome: 'Recibo',           titulo: 'RECIBO',           pref: 'RC ', seq: 'rcSeq', cfg: 'cfg-prefix-rc' }
+};
+const NUM_DOC_CAMPOS = ['sub','desconto','descValor','iva','total','valorRecebido','facturaTotal','pagoAnterior','saldoApos'];
+
+function round2(x) { return Math.round((+x || 0) * 100) / 100; }
+function hojeISO() { return dataLocalISO(new Date()); }
+
+function dadosDoForm() {
+  return {
+    tipo: 'COT', num: gv('cot-num'), data: gv('cot-data'), venc: gv('cot-venc'), validade: gv('cot-validade'),
+    moeda: gv('cot-moeda'), cond: gv('cot-cond'), tempo: gv('cot-tempo'), obs: gv('cot-obs'),
+    cliNome: gv('cli-nome'), cliNuit: gv('cli-nuit'), cliEnd: gv('cli-end'),
+    cliCidade: gv('cli-cidade'), cliTel: gv('cli-tel'), cliEmail: gv('cli-email'),
+    items: items, descTipo: gv('cot-desc-tipo'), descValor: gv('cot-desc-valor')
+  };
+}
+function cotacaoDoForm() {
+  const t = calcTotaisComDesconto();
+  return Object.assign(dadosDoForm(), {
+    items: JSON.parse(JSON.stringify(items)),
+    sub: t.sub, descTipo: t.descTipo, descValor: t.descValor, desconto: t.desconto, iva: t.iva, total: t.total
+  });
+}
+
+/* ────────── Armazenamento */
+function getDocs() { try { return JSON.parse(localStorage.getItem('documentos') || '[]'); } catch (e) { return []; } }
+function setDocs(a) { localStorage.setItem('documentos', JSON.stringify(a)); }
+function docId(tipo, num) { return tipo + ':' + num; }
+
+function guardarDoc(doc) {
+  doc.atualizadoEm = new Date().toISOString();
+  const docs = getDocs();
+  const i = docs.findIndex(x => x.id === doc.id);
+  if (i >= 0) docs[i] = doc; else docs.unshift(doc);
+  setDocs(docs);
+  if (temDB()) {
+    dbCall('saveDocumento', { documento: doc }).then(r => {
+      if (r && r.ok) setDbStatus(true, 'Documento sincronizado com a Base de Dados.');
+    });
+  }
+}
+
+function normDoc(x) {
+  const o = Object.assign({}, x);
+  NUM_DOC_CAMPOS.forEach(k => { o[k] = +o[k] || 0; });
+  o.items = Array.isArray(o.items) ? o.items : [];
+  ['obs','metodo','origem','facturaId','estado','cond','venc'].forEach(k => { if (o[k] == null) o[k] = ''; });
+  return o;
+}
+/* Junta os documentos da Base de Dados com os locais (nunca perde nada):
+   para cada id fica o mais recente; o que só existe localmente é enviado. */
+function mesclarDocumentos(remotos) {
+  const mapa = {};
+  remotos.forEach(x => { const o = normDoc(x); if (o.id) mapa[o.id] = o; });
+  const aEnviar = [];
+  getDocs().forEach(l => {
+    const r = mapa[l.id];
+    if (!r) { mapa[l.id] = l; aEnviar.push(l); }
+    else if ((l.atualizadoEm || '') > (r.atualizadoEm || '')) { mapa[l.id] = l; aEnviar.push(l); }
+  });
+  setDocs(Object.values(mapa).sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || ''))));
+  if (temDB()) aEnviar.forEach(x => dbCall('saveDocumento', { documento: x }));
+}
+
+/* ────────── Numeração por tipo (nunca recua) */
+function prefixoDoc(tipo) {
+  const v = localStorage.getItem(TIPOS_DOC[tipo].cfg);
+  return (v === null || v === '') ? TIPOS_DOC[tipo].pref : v;
+}
+function seqMaximoDoc(tipo) {
+  let max = parseInt(localStorage.getItem(TIPOS_DOC[tipo].seq) || 0) || 0;
+  getDocs().forEach(d => { if (d.tipo === tipo) { const n = seqDeNum(d.num); if (n > max) max = n; } });
+  return max;
+}
+function registarSeqDoc(tipo, n) {
+  const k = TIPOS_DOC[tipo].seq;
+  const atual = parseInt(localStorage.getItem(k) || 0) || 0;
+  if (n > atual) {
+    localStorage.setItem(k, n);
+    if (temDB()) dbCall('saveConfig', { config: { [k]: String(n) } });
+  }
+}
+function proximoNumDoc(tipo) {
+  const h = new Date();
+  const dd = String(h.getDate()).padStart(2, '0'), mm = String(h.getMonth() + 1).padStart(2, '0');
+  return prefixoDoc(tipo) + String(seqMaximoDoc(tipo) + 1).padStart(4, '0') + '/' + dd + mm + h.getFullYear();
+}
+
+/* ────────── Estado / saldo das facturas */
+function pagosPorFactura() {
+  const m = {};
+  getDocs().forEach(d => {
+    if (d.tipo === 'RC' && d.estado !== 'Anulado') m[d.facturaId] = (m[d.facturaId] || 0) + (+d.valorRecebido || 0);
+  });
+  return m;
+}
+function infoDoc(d, pagos) {
+  if (d.estado === 'Anulado') return { estado: 'Anulado', pago: 0, saldo: 0, vencida: false };
+  if (d.tipo === 'VD') return { estado: 'Pago', pago: +d.total || 0, saldo: 0, vencida: false };
+  if (d.tipo === 'RC') return { estado: 'Recebido', pago: +d.valorRecebido || 0, saldo: 0, vencida: false };
+  const pago = (pagos || {})[d.id] || 0;
+  const saldo = Math.max(0, round2((+d.total || 0) - pago));
+  const estado = saldo <= 0.005 ? 'Paga' : (pago > 0.005 ? 'Parcial' : 'Pendente');
+  const vencida = saldo > 0.005 && !!d.venc && d.venc < hojeISO();
+  return { estado, pago, saldo, vencida };
+}
+function badgeFacturada(num) {
+  const ds = getDocs().filter(d => d.origem === num && (d.tipo === 'FT' || d.tipo === 'VD') && d.estado !== 'Anulado');
+  if (!ds.length) return '';
+  const d0 = ds.find(d => d.tipo === 'FT') || ds[0];
+  return `<span class="tag tag-${d0.tipo}" title="${esc(ds.map(d => d.num).join(', '))}">${d0.tipo === 'FT' ? 'Facturada' : 'VD'} · ${esc(d0.num)}</span>`;
+}
+
+/* ────────── Emitir FACTURA / VD a partir de uma cotação */
+let _emitir = null;
+function abrirEmitir(tipo, ref) {
+  let cot;
+  if (ref === '__form__') {
+    cot = cotacaoDoForm();
+    if (!cot.items.some(it => String(it.desc || '').trim() && calcLiq(it) > 0)) {
+      showToast('⚠️ Adicione pelo menos um item com descrição e valor.'); return;
+    }
+    const guardada = JSON.parse(localStorage.getItem('cotacoes') || '[]').find(c => c.num === cot.num);
+    cot.origem = guardada ? cot.num : '';
+  } else {
+    const c = JSON.parse(localStorage.getItem('cotacoes') || '[]').find(x => x.num === ref);
+    if (!c) { showToast('⚠️ Cotação não encontrada.'); return; }
+    cot = JSON.parse(JSON.stringify(c));
+    cot.origem = c.num;
+  }
+  if (tipo === 'FT' && !String(cot.cliNome || '').trim()) {
+    showToast('⚠️ Indique o nome do cliente para emitir uma factura.'); return;
+  }
+  if (cot.origem) {
+    const ja = getDocs().filter(d => d.origem === cot.origem && (d.tipo === 'FT' || d.tipo === 'VD') && d.estado !== 'Anulado');
+    if (ja.length && !confirm(`Esta cotação já tem ${ja[0].tipo === 'FT' ? 'a factura' : 'a venda a dinheiro'} ${ja[0].num}. Emitir outro documento mesmo assim?`)) return;
+  }
+  _emitir = { tipo, cot };
+  document.getElementById('em-titulo').textContent = tipo === 'FT' ? '🧾 Emitir Factura' : '💵 Emitir Venda a Dinheiro';
+  document.getElementById('em-info').textContent =
+    `${cot.origem ? 'Cotação ' + cot.origem : 'Dados do formulário'} · Cliente: ${cot.cliNome || '—'} · Total: ${fmt(cot.total)} ${cot.moeda || 'MT'}`;
+  document.getElementById('em-num').value = proximoNumDoc(tipo);
+  document.getElementById('em-data').value = hojeISO();
+  const v = new Date(); v.setDate(v.getDate() + 15);
+  document.getElementById('em-venc').value = (cot.venc && cot.venc >= hojeISO()) ? cot.venc : dataLocalISO(v);
+  document.getElementById('em-obs').value = cot.obs || '';
+  document.getElementById('em-venc-wrap').style.display = tipo === 'FT' ? '' : 'none';
+  document.getElementById('em-metodo-wrap').style.display = tipo === 'VD' ? '' : 'none';
+  document.getElementById('modal-emitir').classList.add('open');
+}
+
+function confirmarEmitir() {
+  if (!_emitir) return;
+  const { tipo, cot } = _emitir;
+  const num = gv('em-num').trim();
+  if (!num) { showToast('⚠️ Indique o número do documento.'); return; }
+  const id = docId(tipo, num);
+  if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe um documento com este número.'); return; }
+  const total = +cot.total || 0;
+  const doc = normDoc({
+    id, tipo, num, data: gv('em-data') || hojeISO(), venc: tipo === 'FT' ? gv('em-venc') : '',
+    moeda: cot.moeda || 'MT', cond: tipo === 'VD' ? 'Pronto Pagamento' : (cot.cond || ''),
+    metodo: tipo === 'VD' ? gv('em-metodo') : '', origem: cot.origem || '', obs: gv('em-obs'), estado: 'Emitido',
+    cliNome: cot.cliNome || (tipo === 'VD' ? 'Consumidor Final' : ''), cliNuit: cot.cliNuit || '', cliEnd: cot.cliEnd || '',
+    cliCidade: cot.cliCidade || '', cliTel: cot.cliTel || '', cliEmail: cot.cliEmail || '',
+    items: JSON.parse(JSON.stringify(cot.items || [])),
+    sub: cot.sub, descTipo: cot.descTipo || 'pct', descValor: cot.descValor, desconto: cot.desconto, iva: cot.iva, total,
+    valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString()
+  });
+  guardarDoc(doc);
+  registarSeqDoc(tipo, seqDeNum(num));
+  fecharModal();
+  _emitir = null;
+  showToast(`✅ ${TIPOS_DOC[tipo].nome} ${num} emitida.`);
+  switchTab('documentos');
+}
+
+/* ────────── Emitir RECIBO a partir de uma factura */
+let _reciboDe = null;
+function abrirRecibo(idEnc) {
+  const f = getDocs().find(x => x.id === decodeURIComponent(idEnc));
+  if (!f) return;
+  const inf = infoDoc(f, pagosPorFactura());
+  if (f.estado === 'Anulado') { showToast('⚠️ Factura anulada.'); return; }
+  if (inf.saldo <= 0.005) { showToast('Esta factura já está totalmente paga.'); return; }
+  _reciboDe = f;
+  document.getElementById('rc-info').textContent =
+    `Factura ${f.num} · ${f.cliNome || '—'} · Total ${fmt(f.total)} · Já recebido ${fmt(inf.pago)} · Saldo ${fmt(inf.saldo)} ${f.moeda}`;
+  document.getElementById('rc-num').value = proximoNumDoc('RC');
+  document.getElementById('rc-data').value = hojeISO();
+  document.getElementById('rc-valor').value = inf.saldo.toFixed(2);
+  document.getElementById('rc-obs').value = '';
+  document.getElementById('modal-recibo').classList.add('open');
+}
+
+function confirmarRecibo() {
+  const f = _reciboDe; if (!f) return;
+  const num = gv('rc-num').trim();
+  if (!num) { showToast('⚠️ Indique o número do recibo.'); return; }
+  const id = docId('RC', num);
+  if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe um recibo com este número.'); return; }
+  const inf = infoDoc(getDocs().find(x => x.id === f.id) || f, pagosPorFactura());
+  const valor = round2(parseFloat(gv('rc-valor')));
+  if (!(valor > 0)) { showToast('⚠️ Indique o valor recebido.'); return; }
+  if (valor > inf.saldo + 0.005) { showToast(`⚠️ O valor excede o saldo da factura (${fmt(inf.saldo)}).`); return; }
+  const doc = normDoc({
+    id, tipo: 'RC', num, data: gv('rc-data') || hojeISO(), moeda: f.moeda, metodo: gv('rc-metodo'), obs: gv('rc-obs'),
+    estado: 'Emitido', origem: f.num, facturaId: f.id,
+    cliNome: f.cliNome, cliNuit: f.cliNuit, cliEnd: f.cliEnd, cliCidade: f.cliCidade, cliTel: f.cliTel, cliEmail: f.cliEmail,
+    items: [], sub: 0, descTipo: 'pct', descValor: 0, desconto: 0, iva: 0, total: valor, valorRecebido: valor,
+    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString()
+  });
+  guardarDoc(doc);
+  registarSeqDoc('RC', seqDeNum(num));
+  fecharModal();
+  _reciboDe = null;
+  showToast(`✅ Recibo ${num} emitido. Saldo da factura: ${fmt(doc.saldoApos)} ${f.moeda}`);
+  renderDocList();
+}
+
+/* ────────── Lista de documentos */
+function previewDoc(idEnc) {
+  const d = getDocs().find(x => x.id === decodeURIComponent(idEnc));
+  if (!d) return;
+  _docPreview = d;
+  switchTab('preview');
+}
+
+function anularDoc(idEnc) {
+  const docs = getDocs();
+  const d = docs.find(x => x.id === decodeURIComponent(idEnc));
+  if (!d || d.estado === 'Anulado') return;
+  if (d.tipo === 'FT' && docs.some(r => r.tipo === 'RC' && r.facturaId === d.id && r.estado !== 'Anulado')) {
+    alert('Esta factura tem recibos emitidos. Anule primeiro os recibos.'); return;
+  }
+  if (!confirm(`Anular ${TIPOS_DOC[d.tipo].nome} ${d.num}?\nO documento fica registado como ANULADO e deixa de contar nos resumos.`)) return;
+  d.estado = 'Anulado'; d.anuladoEm = new Date().toISOString();
+  guardarDoc(d);
+  renderDocList();
+  showToast('🚫 Documento anulado.');
+}
+
+function renderDocList() {
+  const wrap = document.getElementById('doc-list-wrap');
+  if (!wrap) return;
+  const q = gv('doc-q').toLowerCase().trim(), ft = gv('doc-f-tipo'), fe = gv('doc-f-estado');
+  const pagos = pagosPorFactura();
+  const todos = getDocs().slice().sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')) || String(b.num).localeCompare(String(a.num)));
+  const lista = todos.filter(d => {
+    const inf = infoDoc(d, pagos);
+    if (ft && d.tipo !== ft) return false;
+    if (fe && !(fe === 'Vencida' ? inf.vencida : inf.estado === fe)) return false;
+    if (q && !(String(d.num).toLowerCase().includes(q) || String(d.cliNome || '').toLowerCase().includes(q))) return false;
+    return true;
+  });
+  if (!lista.length) {
+    wrap.innerHTML = `<div class="empty-state"><div class="big">🧾</div><p style="font-size:14px;font-weight:600">${todos.length ? 'Nenhum documento corresponde ao filtro' : 'Ainda não há facturas, vendas a dinheiro ou recibos'}</p><p style="margin-top:6px;font-size:12px">Em <strong>Cotações Guardadas</strong> use 🧾 Facturar ou 💵 VD. O recibo cria-se a partir da factura.</p></div>`;
+    return;
+  }
+  wrap.innerHTML = '<div class="cot-list">' + lista.map(d => {
+    const inf = infoDoc(d, pagos), anul = d.estado === 'Anulado', enc = encodeURIComponent(d.id);
+    const valor = d.tipo === 'RC' ? d.valorRecebido : d.total;
+    const ref = d.tipo === 'RC' ? ` · Factura ${esc(d.origem)}` : (d.origem ? ` · Cot. ${esc(d.origem)}` : '');
+    const saldoTxt = (d.tipo === 'FT' && !anul && inf.saldo > 0.005) ? ` <span style="font-size:11px;color:var(--muted)">Saldo ${fmt(inf.saldo)}</span>` : '';
+    return `<div class="cot-card doc-card ${anul ? 'anulado' : ''}">
+      <div class="cot-card-num"><span class="tag tag-${d.tipo}">${d.tipo}</span> ${esc(d.num)}</div>
+      <div class="cot-card-cli">${esc(d.cliNome || '—')}<span style="font-weight:400;color:var(--muted);font-size:11px">${ref}</span></div>
+      <div class="cot-card-meta">${fmtDate(d.data)}</div>
+      <div class="cot-card-total">${fmt(valor)} ${esc(d.moeda)}</div>
+      <div style="min-width:130px"><span class="tag st-${inf.estado}">${inf.estado}</span>${inf.vencida ? ' <span class="tag st-Vencida">Vencida</span>' : ''}${saldoTxt}</div>
+      <div class="cot-card-actions">
+        <button class="btn btn-success btn-sm" title="Ver / Exportar PDF" onclick="previewDoc('${enc}')">👁️</button>
+        ${d.tipo === 'FT' && !anul && inf.saldo > 0.005 ? `<button class="btn btn-primary btn-sm" onclick="abrirRecibo('${enc}')">💰 Recibo</button>` : ''}
+        ${!anul ? `<button class="btn btn-danger btn-sm" title="Anular" onclick="anularDoc('${enc}')">🚫</button>` : ''}
+      </div></div>`;
+  }).join('') + '</div>';
+}
+
+/* ────────── Documento RECIBO (impressão) */
+function buildRecibo(d) {
+  const cor = document.getElementById('cfg-cor').value || '#1a4fa0';
+  const empNome = lsv('emp-nome') || 'Empresa Emissora';
+  const moeda = d.moeda || 'MT', valor = +d.valorRecebido || 0;
+  const rodape = lsv('cfg-rodape') || 'Documento Processado por Computador';
+  const logoHTML = logoData
+    ? `<div style="height:22mm"><img src="${logoData}" style="max-height:22mm;max-width:68mm;object-fit:contain;display:block"></div>`
+    : `<div style="background:#f0f4ff;border-radius:4px;color:${cor};font-weight:700;font-size:13px;letter-spacing:1px;padding:10px 16px;display:inline-block">${esc(empNome)}</div>`;
+  const info = arr => arr.filter(Boolean).map(x => `<div>${esc(x)}</div>`).join('');
+  const empInfo = info([lsv('emp-end'), lsv('emp-cidade'), lsv('emp-tel') ? 'Tel: ' + lsv('emp-tel') : '', lsv('emp-email'), lsv('emp-nuit') ? 'NUIT: ' + lsv('emp-nuit') : '']);
+  const cliInfo = info([d.cliEnd, d.cliCidade, d.cliTel ? 'Tel: ' + d.cliTel : '', d.cliEmail, d.cliNuit ? 'NUIT: ' + d.cliNuit : '']);
+  const anul = d.estado === 'Anulado';
+  const th = (t, r) => `<th class="${r ? 'r' : ''}">${t}</th>`;
+  const topo = `
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5mm;padding-bottom:4mm;border-bottom:2.5px solid ${cor}">
+    <div>${logoHTML}</div>
+    <div style="text-align:right">
+      <div style="font-size:24px;font-weight:700;color:${cor};letter-spacing:2px">RECIBO</div>
+      <div style="font-size:14px;font-weight:700;color:${cor};margin-top:2px">Nº ${esc(d.num)}</div>
+      <div style="font-size:10px;color:#555;margin-top:3px">${fmtDate(d.data)}</div>
+      <div style="font-size:9px;background:${anul ? '#c0392b' : cor};color:#fff;padding:2px 9px;border-radius:3px;display:inline-block;margin-top:5px">${anul ? 'ANULADO' : 'Original'}</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin-bottom:6mm">
+    <div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm"><div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(empNome)}</div><div style="font-size:9.5px;color:#444;line-height:1.7">${empInfo}</div></div>
+    <div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm"><div style="font-size:13px;font-weight:700;margin-bottom:3px">${esc(d.cliNome || '—')}</div><div style="font-size:9.5px;color:#444;line-height:1.7">${cliInfo}</div></div>
+  </div>
+  <div style="border:1px solid #c5d8f7;border-radius:4px;background:#f0f4ff;padding:5mm;margin-bottom:6mm;font-size:12px;line-height:1.7">
+    Recebemos de <strong>${esc(d.cliNome || '—')}</strong> a quantia de
+    <strong style="color:${cor};font-size:15px">${fmt(valor)} ${esc(moeda)}</strong>,
+    referente ao pagamento da factura <strong>Nº ${esc(d.origem)}</strong>.
+    <div style="font-style:italic;color:${cor};font-size:11px;margin-top:2mm"><strong>Por extenso:</strong> ${valorPorExtenso(valor, moeda)}</div>
+  </div>
+  <table style="margin-bottom:6mm">
+    <thead><tr>${th('Factura Nº')}${th('Total da Factura', 1)}${th('Pago anteriormente', 1)}${th('Valor deste recibo', 1)}${th('Saldo em dívida', 1)}</tr></thead>
+    <tbody><tr>
+      <td>${esc(d.origem)}</td><td class="r">${fmt(d.facturaTotal)}</td><td class="r">${fmt(d.pagoAnterior)}</td>
+      <td class="r"><strong>${fmt(valor)}</strong></td><td class="r"><strong>${fmt(d.saldoApos)}</strong></td>
+    </tr></tbody>
+  </table>
+  <div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm;font-size:10px">
+    <div style="font-size:8px;font-weight:700;color:${cor};text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px">Dados do Pagamento</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+      <div><span style="color:#555">Método de pagamento: </span><span style="font-weight:600">${esc(d.metodo || '—')}</span></div>
+      <div><span style="color:#555">Data do pagamento: </span><span style="font-weight:600">${fmtDate(d.data)}</span></div>
+    </div>
+    ${String(d.obs || '').trim() ? `<div style="margin-top:3mm;white-space:pre-wrap;line-height:1.5;color:#333"><span style="color:#555">Observações: </span>${esc(d.obs)}</div>` : ''}
+  </div>`;
+  const rod = `<div class="cot-doc-footer">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16mm;margin-bottom:8mm">
+    <div><div style="border-top:1px solid #888;padding-top:5px;font-size:9.5px;color:#555;text-align:center">Assinatura e Carimbo do Emitente</div></div>
+    <div><div style="border-top:1px solid #888;padding-top:5px;font-size:9.5px;color:#555;text-align:center">Assinatura do Cliente</div></div>
+  </div>
+  <div style="border-top:1px solid #d0d5dd;padding-top:3mm;text-align:center;font-size:9px;color:#888">${esc(rodape)}</div>
+</div>`;
+  return `<div class="cot-pages"><div class="cot-doc cot-page"><div class="cot-doc-body">${topo}</div>${rod}</div></div>`;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RESUMOS: movimentos, IVA, facturação, recebimentos, dívida
+   ════════════════════════════════════════════════════════════════ */
+let _resInit = false;
+function iniciarResumos() {
+  if (!_resInit) { _resInit = true; periodoRapido('mes'); } else renderResumos();
+}
+function periodoRapido(p) {
+  const h = new Date(), y = h.getFullYear(), m = h.getMonth();
+  let de = '', ate = '';
+  if (p === 'mes')    { de = dataLocalISO(new Date(y, m, 1));     ate = dataLocalISO(new Date(y, m + 1, 0)); }
+  if (p === 'mesant') { de = dataLocalISO(new Date(y, m - 1, 1)); ate = dataLocalISO(new Date(y, m, 0)); }
+  if (p === 'ano')    { de = dataLocalISO(new Date(y, 0, 1));     ate = dataLocalISO(new Date(y, 11, 31)); }
+  document.getElementById('res-de').value = de;
+  document.getElementById('res-ate').value = ate;
+  renderResumos();
+}
+
+function resSoma(arr, f) { return arr.reduce((a, x) => a + (+f(x) || 0), 0); }
+
+function linhasMovimentos() {
+  const de = gv('res-de'), ate = gv('res-ate'), moeda = gv('res-moeda') || 'MT';
+  return getDocs()
+    .filter(d => d.moeda === moeda && (!de || d.data >= de) && (!ate || d.data <= ate))
+    .sort((a, b) => String(a.data).localeCompare(String(b.data)) || String(a.num).localeCompare(String(b.num)))
+    .map(d => {
+      const anul = d.estado === 'Anulado';
+      const ehFat = d.tipo === 'FT' || d.tipo === 'VD';
+      return {
+        data: d.data, tipo: d.tipo, num: d.num, cliente: d.cliNome || '—', anul,
+        base: ehFat ? round2((+d.sub || 0) - (+d.desconto || 0)) : null,
+        iva: ehFat ? round2(d.iva) : null,
+        total: ehFat ? round2(d.total) : null,
+        recebido: d.tipo === 'RC' ? round2(d.valorRecebido) : (d.tipo === 'VD' ? round2(d.total) : null)
+      };
+    });
+}
+
+function renderResumos() {
+  const wrap = document.getElementById('res-wrap');
+  if (!wrap) return;
+  const de = gv('res-de'), ate = gv('res-ate'), moeda = gv('res-moeda') || 'MT';
+  const todos = getDocs().filter(d => d.moeda === moeda);
+  const validos = todos.filter(d => d.estado !== 'Anulado' && (!de || d.data >= de) && (!ate || d.data <= ate));
+  const fts = validos.filter(d => d.tipo === 'FT'), vds = validos.filter(d => d.tipo === 'VD'), rcs = validos.filter(d => d.tipo === 'RC');
+  const fact = fts.concat(vds), pagos = pagosPorFactura();
+
+  const sub = resSoma(fact, x => x.sub), desc = resSoma(fact, x => x.desconto), iva = resSoma(fact, x => x.iva), totalFact = resSoma(fact, x => x.total);
+  const base = sub - desc;
+  const recebido = resSoma(rcs, x => x.valorRecebido) + resSoma(vds, x => x.total);
+  const ftsTodas = todos.filter(d => d.tipo === 'FT' && d.estado !== 'Anulado');
+  const saldoDe = x => infoDoc(x, pagos).saldo;
+  const porReceberPeriodo = resSoma(fts, saldoDe);
+  const dividaGeral = resSoma(ftsTodas, saldoDe);
+  const vencido = resSoma(ftsTodas.filter(x => infoDoc(x, pagos).vencida), saldoDe);
+
+  const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]')
+    .filter(c => (c.moeda || 'MT') === moeda && (!de || c.data >= de) && (!ate || c.data <= ate));
+
+  // IVA por taxa (respeita o desconto proporcional de cada documento)
+  const taxas = {};
+  fact.forEach(d => {
+    const sb = (d.items || []).reduce((a, it) => a + calcLiq(it), 0);
+    const fator = sb > 0 ? (sb - (+d.desconto || 0)) / sb : 1;
+    (d.items || []).forEach(it => {
+      const b = calcLiq(it) * fator, r = +it.iva || 0;
+      const t = taxas[r] = taxas[r] || { base: 0, iva: 0 };
+      t.base += b; t.iva += b * r / 100;
+    });
+  });
+
+  // Por cliente
+  const cl = {};
+  const C = n => cl[n || '—'] = cl[n || '—'] || { fact: 0, rec: 0, div: 0 };
+  fact.forEach(d => { C(d.cliNome).fact += +d.total || 0; });
+  vds.forEach(d => { C(d.cliNome).rec += +d.total || 0; });
+  rcs.forEach(d => { C(d.cliNome).rec += +d.valorRecebido || 0; });
+  fts.forEach(d => { C(d.cliNome).div += saldoDe(d); });
+
+  const kpi = (l, v, s, cls) => `<div class="kpi ${cls || ''}"><div class="k-l">${l}</div><div class="k-v">${fmt(v)} <span style="font-size:11px;font-weight:600">${moeda}</span></div><div class="k-s">${s || ''}</div></div>`;
+  const movs = linhasMovimentos();
+  const f = v => v == null ? '—' : fmt(v);
+  const tot = k => movs.filter(m => !m.anul).reduce((a, m) => a + (m[k] || 0), 0);
+
+  wrap.innerHTML = `
+  <div class="kpi-grid">
+    ${kpi('Facturação (FT + VD)', totalFact, `${fts.length} facturas · ${vds.length} vendas a dinheiro`, 'b')}
+    ${kpi('IVA liquidado', iva, `Base tributável ${fmt(base)}`)}
+    ${kpi('Recebido', recebido, `${rcs.length} recibos + ${vds.length} VD`, 'g')}
+    ${kpi('Por receber (facturas do período)', porReceberPeriodo, '', porReceberPeriodo > 0.005 ? 'r' : '')}
+  </div>
+  <div class="kpi-grid">
+    ${kpi('Dívida total de clientes', dividaGeral, 'Todas as facturas em aberto', dividaGeral > 0.005 ? 'r' : '')}
+    ${kpi('Vencido', vencido, 'Facturas com vencimento ultrapassado', vencido > 0.005 ? 'r' : '')}
+    ${kpi('Desconto concedido', desc, `Sub-total ${fmt(sub)}`)}
+    ${kpi('Cotações emitidas', resSoma(cots, c => c.total), `${cots.length} cotações no período`)}
+  </div>
+
+  <div class="card"><div class="card-title">🧮 IVA por taxa</div><div class="res-wrap"><table class="res-table">
+    <thead><tr><th>Taxa</th><th class="r">Base tributável</th><th class="r">IVA</th><th class="r">Total c/ IVA</th></tr></thead><tbody>
+    ${Object.keys(taxas).sort((a, b) => a - b).map(r => `<tr><td>${r}%</td><td class="r">${fmt(taxas[r].base)}</td><td class="r">${fmt(taxas[r].iva)}</td><td class="r">${fmt(taxas[r].base + taxas[r].iva)}</td></tr>`).join('') || '<tr><td colspan="4" style="color:var(--muted)">Sem facturação neste período.</td></tr>'}
+    <tr class="tot"><td>Total</td><td class="r">${fmt(Object.values(taxas).reduce((a, t) => a + t.base, 0))}</td><td class="r">${fmt(Object.values(taxas).reduce((a, t) => a + t.iva, 0))}</td><td class="r">${fmt(totalFact)}</td></tr>
+    </tbody></table></div></div>
+
+  <div class="card"><div class="card-title">👥 Por cliente</div><div class="res-wrap"><table class="res-table">
+    <thead><tr><th>Cliente</th><th class="r">Facturado</th><th class="r">Recebido</th><th class="r">Em dívida</th></tr></thead><tbody>
+    ${Object.keys(cl).sort((a, b) => cl[b].fact - cl[a].fact).map(n => `<tr><td>${esc(n)}</td><td class="r">${fmt(cl[n].fact)}</td><td class="r">${fmt(cl[n].rec)}</td><td class="r" style="${cl[n].div > 0.005 ? 'color:var(--red);font-weight:700' : ''}">${fmt(cl[n].div)}</td></tr>`).join('') || '<tr><td colspan="4" style="color:var(--muted)">Sem movimentos neste período.</td></tr>'}
+    </tbody></table></div></div>
+
+  <div class="card"><div class="card-title">📒 Movimentos do período</div><div class="res-wrap"><table class="res-table">
+    <thead><tr><th>Data</th><th>Tipo</th><th>Nº</th><th>Cliente</th><th class="r">Base</th><th class="r">IVA</th><th class="r">Total</th><th class="r">Recebido</th></tr></thead><tbody>
+    ${movs.map(m => `<tr class="${m.anul ? 'anul' : ''}"><td>${fmtDate(m.data)}</td><td><span class="tag tag-${m.tipo}">${m.tipo}</span>${m.anul ? ' <span class="tag st-Anulado">Anulado</span>' : ''}</td><td>${esc(m.num)}</td><td>${esc(m.cliente)}</td><td class="r">${f(m.base)}</td><td class="r">${f(m.iva)}</td><td class="r">${f(m.total)}</td><td class="r">${f(m.recebido)}</td></tr>`).join('') || '<tr><td colspan="8" style="color:var(--muted)">Sem movimentos neste período.</td></tr>'}
+    <tr class="tot"><td colspan="4">Totais (sem anulados)</td><td class="r">${fmt(tot('base'))}</td><td class="r">${fmt(tot('iva'))}</td><td class="r">${fmt(tot('total'))}</td><td class="r">${fmt(tot('recebido'))}</td></tr>
+    </tbody></table></div></div>`;
+}
+
+function exportarMovimentosCSV() {
+  const movs = linhasMovimentos();
+  if (!movs.length) { showToast('Não há movimentos para exportar neste período.'); return; }
+  const n = v => v == null ? '' : v.toFixed(2).replace('.', ',');
+  const q = t => '"' + String(t).replace(/"/g, '""') + '"';
+  const linhas = [['Data','Tipo','Número','Cliente','Base','IVA','Total','Recebido','Estado'].join(';')]
+    .concat(movs.map(m => [m.data, m.tipo, q(m.num), q(m.cliente), n(m.base), n(m.iva), n(m.total), n(m.recebido), m.anul ? 'Anulado' : 'Válido'].join(';')));
+  const blob = new Blob(['\ufeff' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `movimentos_${gv('res-de') || 'inicio'}_${gv('res-ate') || 'hoje'}_${gv('res-moeda') || 'MT'}.csv`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
 /* ────────── START */
