@@ -128,7 +128,10 @@ textarea{resize:vertical;min-height:58px}
   color:#1a1a1a;box-shadow:0 2px 20px rgba(0,0,0,.18);
   display:flex;flex-direction:column;
 }
-.cot-doc.preview-mode{min-height:297mm}
+.cot-pages{display:flex;flex-direction:column;align-items:center;gap:8mm}
+/* Cada folha = 1 página A4 fixa (296mm evita página em branco ao imprimir) */
+.cot-page{height:296mm;overflow:hidden;page-break-after:always;break-after:page}
+.cot-page:last-child{page-break-after:auto;break-after:auto}
 .cot-doc-body{flex:1;display:flex;flex-direction:column}
 .cot-doc-footer{margin-top:auto;padding-top:6mm}
 .cot-doc table{width:100%;border-collapse:collapse}
@@ -360,6 +363,7 @@ body.locked{overflow:hidden}
     <div class="form-grid">
       <div class="field"><label>Cor Principal</label><input type="color" id="cfg-cor" value="#1a4fa0" style="height:38px;cursor:pointer"></div>
       <div class="field"><label>Prefixo Numeração</label><input type="text" id="cfg-prefix" placeholder="COT- ou deixar vazio"></div>
+      <div class="field"><label>Altura do logotipo nas páginas seguintes (mm)</label><input type="number" id="cfg-logo2" min="6" max="25" value="12"></div>
     </div>
   </div>
 
@@ -896,7 +900,7 @@ function calcTotaisComDesconto() {
 
 /* ────────── CONFIG */
 function salvarConfig() {
-  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape']
+  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape','cfg-logo2']
     .forEach(f => localStorage.setItem(f, document.getElementById(f).value));
   localStorage.setItem('cfg-cor', document.getElementById('cfg-cor').value);
   if (logoData) localStorage.setItem('logoData', logoData);
@@ -909,7 +913,7 @@ function salvarConfig() {
 
   if (temDB()) {
     const cfg = {};
-    ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape','cfg-cor']
+    ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape','cfg-cor','cfg-logo2']
       .forEach(f => cfg[f] = gv(f));
     if (logoData) cfg.logoData = logoData;
     dbCall('saveConfig', { config: cfg }).then(r => {
@@ -919,7 +923,7 @@ function salvarConfig() {
 }
 
 function carregarConfig() {
-  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape']
+  ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-rodape','cfg-logo2']
     .forEach(f => { const v=localStorage.getItem(f); if(v && document.getElementById(f)) document.getElementById(f).value=v; });
   const cor = localStorage.getItem('cfg-cor');
   if (cor) document.getElementById('cfg-cor').value = cor;
@@ -1405,8 +1409,7 @@ function limparPreview() {
 /* ────────── BUILD DOCUMENT */
 function gerarPreview() {
   document.getElementById('cot-preview').innerHTML = buildDoc();
-  const doc = document.querySelector('#cot-preview .cot-doc');
-  if (doc) doc.classList.add('preview-mode');
+
 }
 
 function buildDoc() {
@@ -1447,7 +1450,7 @@ function buildDoc() {
   const descLabel = descTipo === 'pct' && descValor > 0 ? `Desconto (${fmt(descValor)}%)` : 'Desconto Financeiro';
 
   const logoHTML = logoData
-    ? `<img src="${logoData}" style="max-height:22mm;max-width:68mm;object-fit:contain;display:block">`
+    ? `<div style="height:22mm"><img src="${logoData}" style="max-height:22mm;max-width:68mm;object-fit:contain;display:block"></div>`
     : `<div style="background:#f0f4ff;border-radius:4px;color:${cor};font-weight:700;font-size:13px;letter-spacing:1px;padding:10px 16px;display:inline-block">${esc(empNome)}</div>`;
 
   const empInfo = [empEnd, empCidade, empTel?'Tel: '+empTel:'', empEmail, empNuit?'NUIT: '+empNuit:'']
@@ -1456,7 +1459,7 @@ function buildDoc() {
   const cliInfo = [cliEnd, cliCidade, cliTel?'Tel: '+cliTel:'', cliEmail, cliNuit?'NUIT: '+cliNuit:'']
     .filter(Boolean).map(s=>`<div>${esc(s)}</div>`).join('');
 
-  const rows = items.map((it,i)=>`
+  const rowsArr = items.map((it,i)=>`
     <tr>
       <td>${String(i+1).padStart(2,'0')}</td>
       <td>${esc(it.ref)||'—'}</td>
@@ -1466,15 +1469,12 @@ function buildDoc() {
       <td class="r">${fmt(it.pu)}</td>
       <td class="r">${it.iva}%</td>
       <td class="r"><strong>${fmt(calcLiq(it))}</strong></td>
-    </tr>`).join('');
+    </tr>`);
 
   const extensoHTML = valorPorExtenso(total, moeda);
 
-  return `
-<div class="cot-doc">
-<div class="cot-doc-body">
-
-  <!-- CABEÇALHO -->
+  // ── Blocos do documento ──
+  const htmlTopo   = `  <!-- CABEÇALHO -->
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5mm;padding-bottom:4mm;border-bottom:2.5px solid ${cor}">
     <div>${logoHTML}</div>
     <div style="text-align:right">
@@ -1505,9 +1505,8 @@ function buildDoc() {
         <span style="font-weight:600">${v}</span></div>`).join('')}
   </div>
 
-  <!-- TABELA ITENS -->
-  <table style="margin-bottom:4mm">
-    <thead><tr>
+`;
+  const theadHTML  = `<thead><tr>
       <th style="width:26px">Nº</th>
       <th style="width:75px">Ref.</th>
       <th>Descrição</th>
@@ -1516,11 +1515,8 @@ function buildDoc() {
       <th class="r" style="width:80px">Pr. Unit.</th>
       <th class="r" style="width:40px">IVA</th>
       <th class="r" style="width:86px">Total Liq.</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-
-  <!-- TOTAIS -->
+    </tr></thead>`;
+  const htmlFinal  = `  <!-- TOTAIS -->
   <div style="display:flex;justify-content:flex-end;margin-bottom:3mm">
     <div style="width:72mm;border:1px solid #d0d5dd;border-radius:4px;overflow:hidden;font-size:11px">
       <div style="display:flex;justify-content:space-between;padding:4px 9px"><span style="color:#555">Sub-Total</span><span>${fmt(sub)}</span></div>
@@ -1545,10 +1541,8 @@ function buildDoc() {
     </div>
   </div>
 
-</div><!-- fim cot-doc-body -->
-
-<!-- FOOTER: assinaturas + rodapé sempre na base -->
-<div class="cot-doc-footer">
+`;
+  const htmlRodape = `<div class="cot-doc-footer">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16mm;margin-bottom:8mm">
     <div>
       <div style="border-top:1px solid #888;padding-top:5px;font-size:9.5px;color:#555;text-align:center">Assinatura e Carimbo do Emitente</div>
@@ -1558,9 +1552,65 @@ function buildDoc() {
     </div>
   </div>
   <div style="border-top:1px solid #d0d5dd;padding-top:3mm;text-align:center;font-size:9px;color:#888">${esc(rodape)}</div>
-</div>
-
 </div>`;
+
+  // Logotipo reduzido, centrado, usado no topo das páginas seguintes (verso)
+  const logo2H = Math.min(25, Math.max(6, parseFloat(lsv('cfg-logo2') || gv('cfg-logo2')) || 12));
+  const logoPag2 = (n, tot) => {
+    const logo = logoData
+      ? `<div style="height:${logo2H}mm;display:flex;justify-content:center;align-items:center"><img src="${logoData}" style="max-height:${logo2H}mm;max-width:50mm;object-fit:contain;display:block"></div>`
+      : `<div style="text-align:center;font-weight:700;font-size:12px;letter-spacing:1px;color:${cor}">${esc(empNome)}</div>`;
+    return `${logo}<div style="text-align:center;font-size:9.5px;color:#555;margin:2mm 0 6mm">Cotação Nº <strong style="color:${cor}">${esc(cotNum)}</strong> &nbsp;·&nbsp; Pág. ${n}/${tot}</div>`;
+  };
+  const tabHTML = (linhas) => `<table style="margin-bottom:4mm">${theadHTML}<tbody>${linhas}</tbody></table>`;
+
+  // ── Medição (px) para respeitar o limite da página A4 ──
+  const MM = 96/25.4;
+  const AVAIL = (296 - 22 - 3) * MM;      // folha 296mm − margens 22mm − folga 3mm
+  const med = document.createElement('div');
+  med.className = 'cot-doc';
+  med.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;min-height:0;box-shadow:none';
+  med.innerHTML = `
+    <div class="m-topo"   style="display:flow-root">${htmlTopo}</div>
+    <div class="m-pag2"   style="display:flow-root">${logoPag2(2,2)}</div>
+    <div class="m-final"  style="display:flow-root">${htmlFinal}</div>
+    <div class="m-rodape" style="display:flow-root">${htmlRodape}</div>
+    <div class="m-tab">${tabHTML(rowsArr.join(''))}</div>`;
+  document.body.appendChild(med);
+  const H = c => med.querySelector(c).offsetHeight;
+  const hTopo = H('.m-topo'), hPag2 = H('.m-pag2'), hFinal = H('.m-final'), hRod = H('.m-rodape');
+  const tabEl = med.querySelector('.m-tab table');
+  const hHead = tabEl.tHead.offsetHeight;
+  const hRows = Array.from(tabEl.tBodies[0].rows).map(r => r.offsetHeight);
+  document.body.removeChild(med);
+  const hTabM = 4 * MM;
+
+  // ── Paginação ──
+  // Página 1: cabeçalho completo + linhas que couberem.
+  // Páginas seguintes (verso): só o logotipo reduzido ao centro + continuação.
+  // A parte final (totais, extenso, condições, assinaturas, rodapé) segue
+  // sempre junta; se não couber, passa automaticamente para o verso.
+  const pages = [];
+  let pg = { first: true, rows: [], final: false };
+  let used = hTopo + hHead + hTabM;
+  const novaPagina = () => { pages.push(pg); pg = { first: false, rows: [], final: false }; used = hPag2 + hHead + hTabM; };
+  rowsArr.forEach((r, i) => {
+    if (used + hRows[i] > AVAIL && pg.rows.length > 0) novaPagina();
+    pg.rows.push(r); used += hRows[i];
+  });
+  if (used + hFinal + hRod > AVAIL) { novaPagina(); used = hPag2; }
+  pg.final = true;
+  pages.push(pg);
+
+  return `<div class="cot-pages">` + pages.map((p, i) => `
+<div class="cot-doc cot-page">
+<div class="cot-doc-body">
+  ${p.first ? htmlTopo : logoPag2(i + 1, pages.length)}
+  ${p.rows.length ? tabHTML(p.rows.join('')) : ''}
+  ${p.final ? htmlFinal : ''}
+</div>
+${p.final ? htmlRodape : ''}
+</div>`).join('') + `</div>`;
 }
 
 /* ────────── VALOR POR EXTENSO (PT) */
@@ -1632,7 +1682,7 @@ function exportarPDF() {
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,Helvetica,sans-serif}
     .cot-doc{
-      background:#fff;width:210mm;min-height:297mm;
+      background:#fff;width:210mm;min-height:0;
       margin:0 auto;padding:11mm 14mm;
       font-family:Arial,Helvetica,sans-serif;font-size:11.5px;
       color:#1a1a1a;box-shadow:none;
@@ -1654,10 +1704,13 @@ function exportarPDF() {
       print-color-adjust: exact !important;
       color-adjust: exact !important;
     }
+    .cot-pages{display:block}
+    .cot-page{height:296mm;overflow:hidden;page-break-after:always;break-after:page;margin:0 auto}
+    .cot-page:last-child{page-break-after:auto;break-after:auto}
     @page{size:A4;margin:0}
     @media print{
       html,body{width:210mm}
-      .cot-doc{box-shadow:none!important;page-break-inside:avoid}
+      .cot-doc{box-shadow:none!important}
       .cot-doc-footer{page-break-inside:avoid}
     }
   `;
