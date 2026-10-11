@@ -181,6 +181,7 @@ body.locked{overflow:hidden}
 .cli-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:14px}
 .cli-actions{display:flex;flex-direction:column;gap:4px}
 .icon-inline{display:inline-flex;align-items:center;gap:6px}
+.sync-badge{font-size:10.5px;color:var(--muted);margin-left:8px}
 </style>
 </head>
 <body class="locked">
@@ -225,7 +226,7 @@ body.locked{overflow:hidden}
   <div class="tab" data-tab="resumos" hidden onclick="switchTab('resumos')" data-icon="resumos"><span>Resumos</span></div>
   <div class="tab" data-tab="preview" hidden onclick="switchTab('preview')" data-icon="eye"><span>Pré-visualizar</span></div>
   <div class="tab" data-tab="config" hidden onclick="abrirConfigComPin()" data-icon="config"><span>Configurações</span></div>
-  <div class="tab" id="user-chip" onclick="abrirMinhaConta()" title="A minha conta" style="margin-left:auto;flex:0;white-space:nowrap"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="user-chip-txt"></span></div>
+  <div class="tab" id="user-chip" onclick="abrirMinhaConta()" title="A minha conta" style="margin-left:auto;flex:0;white-space:nowrap"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="user-chip-txt"></span><span class="sync-badge" id="sync-badge"></span></div>
   <div class="tab" onclick="terminarSessao()" style="flex:0"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sair</span></div>
 </div>
 
@@ -350,6 +351,7 @@ body.locked{overflow:hidden}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Cotações Guardadas</h2>
     <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true)">↻ Actualizar</button>
       <button class="btn btn-danger btn-sm" data-perm="apagarTudo" onclick="apagarTodasCotacoes()">Apagar Todas</button>
       <button class="btn btn-primary btn-sm" onclick="irParaNovoDocumento()">Novo Documento</button>
     </div>
@@ -361,7 +363,10 @@ body.locked{overflow:hidden}
 <div class="panel" id="tab-documentos">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Facturas · Vendas a Dinheiro · Recibos</h2>
-    <div style="font-size:12px;color:var(--muted)">Para criar: use <strong>Novo Documento → Factura/VD/Recibo</strong>.</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true)">↻ Actualizar</button>
+      <div style="font-size:12px;color:var(--muted)">Para criar: use <strong>Novo Documento → Factura/VD/Recibo</strong>.</div>
+    </div>
   </div>
   <div class="doc-filtros">
     <input type="text" id="doc-q" placeholder="Pesquisar nº ou cliente..." oninput="renderDocList()" style="min-width:210px">
@@ -380,8 +385,8 @@ body.locked{overflow:hidden}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Carteira de Clientes</h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true)">↻ Actualizar</button>
       <button class="btn btn-primary btn-sm" onclick="abrirClienteModal()">Novo Cliente</button>
-      <button class="btn btn-secondary btn-sm" onclick="carregarClientes()">Actualizar</button>
     </div>
   </div>
   <div class="doc-filtros">
@@ -401,6 +406,7 @@ body.locked{overflow:hidden}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Produtos e Stock</h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true)">↻ Actualizar</button>
       <button class="btn btn-secondary btn-sm" onclick="abrirMovHist()">Movimentos</button>
       <button class="btn btn-primary btn-sm" onclick="abrirModalNovoProduto()">Novo Produto</button>
     </div>
@@ -413,7 +419,10 @@ body.locked{overflow:hidden}
 <div class="panel" id="tab-resumos">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Resumo de Movimentos, IVA e Facturação</h2>
-    <button class="btn btn-secondary btn-sm" onclick="exportarMovimentosCSV()">Exportar movimentos (CSV)</button>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true).then(renderResumos)">↻ Actualizar</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportarMovimentosCSV()">Exportar movimentos (CSV)</button>
+    </div>
   </div>
   <div class="doc-filtros">
     <div class="field"><label>De</label><input type="date" id="res-de" onchange="renderResumos()"></div>
@@ -515,7 +524,7 @@ body.locked{overflow:hidden}
     </div>
     <div class="btn-bar" style="margin-top:10px">
       <button class="btn btn-primary btn-sm" onclick="ligarBaseDados()">Ligar / Testar</button>
-      <button class="btn btn-success btn-sm" onclick="sincronizarTudo()">Sincronizar</button>
+      <button class="btn btn-success btn-sm" onclick="sincronizarAgora(true)">Sincronizar</button>
       <button class="btn btn-secondary btn-sm" onclick="diagnosticoDB()">Diagnóstico</button>
     </div>
     <pre id="db-diag" style="display:none;margin-top:10px;padding:10px;background:#f6f8fc;border:1px solid var(--border);border-radius:6px;font-size:11px;white-space:pre-wrap;max-height:320px;overflow:auto"></pre>
@@ -738,7 +747,7 @@ body.locked{overflow:hidden}
 <script>
 'use strict';
 
-const VERSAO_APP = '2026-10-11-v13';
+const VERSAO_APP = '2026-10-11-v14';
 const LOGIN_USER = 'dullas';
 const LOGIN_PASS = 'dullayes';
 const _DBC = [104,116,116,112,115,58,47,47,115,99,114,105,112,116,46,103,111,111,103,108,101,46,99,111,109,47,109,97,99,114,111,115,47,115,47,65,75,102,121,99,98,121,89,65,49,118,97,84,90,51,56,77,88,66,107,111,69,121,122,118,80,49,87,87,70,48,75,89,116,83,112,66,97,81,79,105,121,116,104,45,115,71,105,71,52,102,111,49,66,105,102,45,70,71,57,65,65,95,99,81,106,111,112,55,121,65,121,47,101,120,101,99];
@@ -747,7 +756,6 @@ const _XK = 0x5A;
 function _xEnc(s) { let r=''; for (let i=0;i<s.length;i++) r += String.fromCharCode(s.charCodeAt(i)^_XK); return btoa(r); }
 function _xDec(s) { try { let d=atob(s), r=''; for (let i=0;i<d.length;i++) r += String.fromCharCode(d.charCodeAt(i)^_XK); return r; } catch(e) { return ''; } }
 
-/* ───────────── ÍCONES SVG (monocromáticos) ───────────── */
 const ICONS = {
   novo:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>',
   guardadas:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
@@ -814,7 +822,6 @@ function pode(p)    { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P[p
 function podeVer(t) { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P.tabs.includes(t)); }
 function painelActivo() { const el = document.querySelector('.panel.active'); return el ? el.id.replace('tab-', '') : 'cotacao'; }
 
-/* ───────────── HELPERS CURTOS ───────────── */
 function gv(id)  { return (document.getElementById(id)||{}).value||''; }
 function lsv(k)  { return localStorage.getItem(k)||''; }
 function jsq(v) { return esc(JSON.stringify(String(v == null ? '' : v))).replace(/'/g, '&#39;'); }
@@ -929,6 +936,7 @@ function entrarNoSistema() {
   aplicarPermissoes();
   atualizarBannerOffline();
   if (!_online) avisarOffline();
+  /* Para QUALQUER perfil: tentar ligar logo */
   if (typeof ligarComRetry === 'function' && temDB()) ligarComRetry();
   reiniciarTimerInatividade();
   setTimeout(() => {
@@ -1108,6 +1116,7 @@ async function dbCallRaw(action, payload) {
 const LIMITE_OFFLINE_MS = 8 * 3600 * 1000;
 const ESCRITAS = { saveCliente:1, deleteCliente:1, saveProduto:1, deleteProduto:1, saveCotacao:1, deleteCotacao:1, saveDocumento:1, saveConfig:1, saveMovStock:1 };
 let _online = true, _avisoOfflineMostrado = false, _flushEmCurso = false;
+let _ultimoPull = 0, _syncEmCurso = null;
 
 function getFila() { try { return JSON.parse(localStorage.getItem('outbox') || '[]'); } catch (e) { return []; } }
 function setFila(f) { localStorage.setItem('outbox', JSON.stringify(f)); }
@@ -1137,6 +1146,10 @@ function enfileirar(action, payload) {
 async function dbCall(action, payload) {
   const r = await dbCallRaw(action, payload);
   if (r === null && ESCRITAS[action] && temDB()) enfileirar(action, payload || {});
+  /* Depois de cada escrita bem-sucedida, dispara pull imediato (mantém 2 utilizadores em sincronia) */
+  if (r && r.ok && ESCRITAS[action] && temDB() && _online) {
+    setTimeout(() => { sincronizarAgora(true); }, 800);
+  }
   return r;
 }
 function marcarOnline() {
@@ -1148,7 +1161,7 @@ function marcarOnline() {
   _avisoOfflineMostrado = false;
   document.getElementById('offline-bloqueio').hidden = true;
   atualizarBannerOffline();
-  if (estavaOffline && SESSAO) setTimeout(() => { if (!_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); } }, 300);
+  if (estavaOffline && SESSAO) setTimeout(() => { sincronizarAgora(true); }, 300);
 }
 function marcarOffline() {
   if (!temDB()) return;
@@ -1168,6 +1181,15 @@ function atualizarBannerOffline() {
   b.hidden = false;
   b.innerHTML = ICONS.wifi + ` <span>Modo offline — restam ${formatarRestante(LIMITE_OFFLINE_MS - offlineMs())}` + (pend ? ` · ${pend} por enviar` : '') + '</span>';
 }
+function atualizarBadgeSync() {
+  const el = document.getElementById('sync-badge');
+  if (!el) return;
+  if (!SESSAO || !temDB() || !_online) { el.textContent = ''; return; }
+  if (!_ultimoPull) { el.textContent = '· a sincronizar'; return; }
+  const s = Math.round((Date.now() - _ultimoPull) / 1000);
+  el.textContent = s < 3 ? '· sync agora' : (s < 60 ? `· sync ${s}s` : `· sync ${Math.floor(s/60)}min`);
+}
+setInterval(atualizarBadgeSync, 2000);
 function avisarOffline() {
   if (_online || !SESSAO || _avisoOfflineMostrado) return;
   _avisoOfflineMostrado = true;
@@ -1190,7 +1212,7 @@ async function tentarReligar() {
   btn.disabled = true; est.textContent = 'A tentar ligar...';
   const r = await dbCallRaw('status', {});
   btn.disabled = false;
-  if (r) { est.textContent = ''; showToast('Ligação restabelecida.'); } else { est.textContent = 'Ainda sem ligação.'; }
+  if (r) { est.textContent = ''; showToast('Ligação restabelecida.'); sincronizarAgora(true); } else { est.textContent = 'Ainda sem ligação.'; }
 }
 function iniciarVigilanciaOffline() {
   if (!localStorage.getItem('ultimoOnline')) localStorage.setItem('ultimoOnline', String(Date.now()));
@@ -1201,7 +1223,7 @@ function iniciarVigilanciaOffline() {
       if (verificarLimiteOffline()) return;
       if (navigator.onLine !== false) await dbCallRaw('status', {});
     }
-  }, 30000);
+  }, 15000);
   if (temDB()) {
     if (navigator.onLine === false) marcarOffline();
     dbCallRaw('status', {});
@@ -1251,11 +1273,14 @@ function resolverConflitoFila(it, r) {
       }
     });
     setFila(f);
-    registarSeqDoc(d.tipo, seq);
+    registrarSeqDocSafe(d.tipo, seq);
     avisarRenumeracao(`${T.nome} ${antigoNum} → ${novo}`);
     return true;
   }
   return false;
+}
+function registrarSeqDocSafe(tipo, seq) {
+  if (typeof registarSeqDoc === 'function') registarSeqDoc(tipo, seq);
 }
 function avisarRenumeracao(txt) {
   registarLog('SYS_RENUMERADA', 'Sistema', txt, 'Número já existia online');
@@ -1321,8 +1346,30 @@ async function ligarBaseDados() {
   if (r && r.ok) {
     setDbStatus(true, 'Ligado com sucesso.');
     showToast('Ligado à Base de Dados!');
-    await sincronizarTudo();
+    await sincronizarAgora(true);
   } else showToast('❌ Falha ao ligar.');
+}
+/* ── NÚCLEO DA SINCRONIZAÇÃO ── */
+/* Pull sob demanda, com protecção contra execuções paralelas e throttle. */
+function sincronizarAgora(forcar) {
+  if (!temDB() || !SESSAO || !_online) return Promise.resolve(false);
+  if (_syncEmCurso) return _syncEmCurso;
+  const agora = Date.now();
+  const minimo = forcar ? 1500 : 5000;
+  if (!forcar && (agora - _ultimoPull) < minimo) return Promise.resolve(true);
+  _syncEmCurso = (async () => {
+    try {
+      await sincronizarTudo();
+      _ultimoPull = Date.now();
+      atualizarBadgeSync();
+      return true;
+    } catch (e) {
+      return false;
+    } finally {
+      _syncEmCurso = null;
+    }
+  })();
+  return _syncEmCurso;
 }
 async function sincronizarTudo() {
   if (!temDB() || !SESSAO) return;
@@ -1406,9 +1453,10 @@ async function sincronizarTudo() {
   if (seqFinal > seqRemoto) dbCall('saveConfig', { config: { cotSeq: String(seqFinal) } });
   if (_numAuto && gv('cot-num') === _numAuto) autoNum();
   const nR = k => Array.isArray(r[k]) ? r[k].length : 0;
-  setDbStatus(true, `Ligado. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
+  const hora = new Date();
+  const hh = String(hora.getHours()).padStart(2, '0') + ':' + String(hora.getMinutes()).padStart(2, '0') + ':' + String(hora.getSeconds()).padStart(2, '0');
+  setDbStatus(true, `Ligado às ${hh}. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
     (r.versao ? ` (script ${r.versao})` : '') + (avisos.length ? `. ⚠️ BD devolveu ${avisos.join(', ')} vazios; dados locais mantidos.` : '.'));
-  showToast(avisos.length ? '⚠️ Dados locais mantidos para ' + avisos.join(', ') : '🔄 Sincronização concluída!');
   const ativo = painelActivo();
   if (ativo === 'guardadas') renderCotList();
   if (ativo === 'produtos') renderProdList();
@@ -1454,28 +1502,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
   iniciarLigacaoPersistente();
   iniciarVigilanciaOffline();
+  atualizarBadgeSync();
   if (SESSAO) atualizarBannerOffline();
 });
 
-let _syncEmCurso = false;
 async function ligarComRetry(tentativa) {
   if (!SESSAO) return;
   tentativa = tentativa || 1;
   setDbStatus(false, 'A ligar' + (tentativa>1 ? ' (tentativa '+tentativa+')' : '') + '...');
   const r = await dbCall('ping', {});
-  if (r && r.ok) { setDbStatus(true, 'Ligado.'); sincronizarTudo(); return; }
+  if (r && r.ok) { setDbStatus(true, 'Ligado.'); sincronizarAgora(true); return; }
   if (tentativa < 5) setTimeout(() => ligarComRetry(tentativa + 1), tentativa * 2000);
   else setDbStatus(false, 'Não foi possível ligar. A trabalhar localmente.');
 }
+/* ── CONEXÃO PERSISTENTE ── */
+/* Enquanto houver internet e DB, sincroniza de 20 em 20 segundos. */
 function iniciarLigacaoPersistente() {
   setInterval(() => {
-    if (temDB() && !_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); }
-  }, 120000);
+    if (temDB() && SESSAO && _online) sincronizarAgora(false);
+  }, 20000);
+  /* Heartbeat próprio para detectar quando o servidor volta a responder */
+  setInterval(async () => {
+    if (!temDB() || !SESSAO) return;
+    if (!_online) { await dbCallRaw('status', {}); return; }
+  }, 15000);
   window.addEventListener('online', () => {
     if (temDB()) { showToast('Ligação restabelecida.'); ligarComRetry(); }
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && temDB() && !_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); }
+    if (document.visibilityState === 'visible' && temDB() && SESSAO) sincronizarAgora(true);
   });
 }
 
@@ -1552,11 +1607,12 @@ function switchTab(id) {
   if (panelEl) panelEl.classList.add('active');
   if (id==='preview') gerarPreview();
   if (id!=='preview') _docPreview = null;
-  if (id==='guardadas') renderCotList();
-  if (id==='documentos') renderDocList();
-  if (id==='clientes') renderClientes();
-  if (id==='resumos') iniciarResumos();
-  if (id==='produtos') renderProdList();
+  /* Ao entrar em tabs sensíveis a dados partilhados, puxa imediatamente do servidor */
+  if (id==='guardadas') { renderCotList(); sincronizarAgora(true); }
+  if (id==='documentos') { renderDocList(); sincronizarAgora(true); }
+  if (id==='clientes') { renderClientes(); sincronizarAgora(true); }
+  if (id==='produtos') { renderProdList(); sincronizarAgora(true); }
+  if (id==='resumos') { iniciarResumos(); sincronizarAgora(true); }
   if (id==='config' && pode('utilizadores')) carregarUsuarios();
   if (id==='config' && pode('db')) { carregarLogs(); carregarArquivos(); }
 }
@@ -1581,9 +1637,11 @@ function escolherTipoDoc(t) {
   document.getElementById('picker-hint').innerHTML = hints[t] || '';
   renderPicker();
 }
-function renderPicker() {
+async function renderPicker() {
   const wrap = document.getElementById('picker-list');
   if (!wrap) return;
+  /* Puxa cotações frescas do servidor antes de mostrar */
+  await sincronizarAgora(true);
   const q = (gv('picker-q') || '').toLowerCase().trim();
   if (_tipoDoc === 'RC') {
     const pagos = pagosPorFactura();
@@ -1871,7 +1929,7 @@ function guardarClienteDoForm() {
   if (temDB()) dbCall('saveCliente', { cliente: cli });
 }
 
-function carregarClientes() { renderClientes(); }
+function carregarClientes() { renderClientes(); sincronizarAgora(true); }
 
 function renderClientes() {
   const wrap = document.getElementById('cli-list-wrap');
@@ -2068,7 +2126,9 @@ function renderAlertasStock() {
     ${falta.map(p => `<div style="margin-top:4px">• <strong>${esc(p.ref||'—')}</strong> ${esc(p.desc||'')} — actual: <strong>${fmt(p.stock)}</strong>, mínimo: ${fmt(p.stockMin)}</div>`).join('')}
   </div>`;
 }
-function abrirMovStock(prodId) {
+async function abrirMovStock(prodId) {
+  /* Puxa stock fresco antes de mostrar */
+  await sincronizarAgora(true);
   const prods = getProdutos();
   if (!prods.length) { showToast('⚠️ Não há produtos.'); return; }
   const p = prodId ? prods.find(x => x.id === prodId) : null;
@@ -2094,10 +2154,12 @@ function descMovTipo() {
   if (t === 'ENTRADA') depois = (+p.stock || 0) + Math.abs(q);
   if (t === 'SAIDA')   depois = (+p.stock || 0) - Math.abs(q);
   if (t === 'AJUSTE')  depois = q;
-  pv.textContent = `Stock: ${fmt(p.stock)} → ${fmt(depois)}`;
+  pv.textContent = `Stock: ${fmt(p.stock)} → ${fmt(depois)}` + (depois < 0 ? '  ⛔ inválido' : '');
   pv.style.display = 'block';
 }
 async function confirmarMovStock() {
+  /* Volta a puxar o stock fresco do servidor imediatamente antes de gravar */
+  await sincronizarAgora(true);
   const prodId = gv('mov-prod-id');
   if (!prodId) { showToast('⚠️ Escolha o produto.'); return; }
   const prods = getProdutos();
@@ -2127,7 +2189,12 @@ async function confirmarMovStock() {
   showToast(`Stock: ${fmt(antes)} → ${fmt(depois)}`);
   renderProdList();
 }
-function abrirMovHist(prodId) { setVal('hist-q', ''); document.getElementById('modal-histstock').classList.add('open'); renderHistStock(prodId); }
+async function abrirMovHist(prodId) {
+  await sincronizarAgora(true);
+  setVal('hist-q', '');
+  document.getElementById('modal-histstock').classList.add('open');
+  renderHistStock(prodId);
+}
 function renderHistStock(prodIdFiltro) {
   const q = (gv('hist-q') || '').toLowerCase();
   let movs = getMovs().slice().sort((a,b) => String(b.ts).localeCompare(String(a.ts)));
@@ -2283,9 +2350,10 @@ function apagarProduto(id) {
   renderProdList();
   if (temDB()) dbCall('deleteProduto', { id });
 }
-function abrirProdSel(itemId) {
+async function abrirProdSel(itemId) {
   _itemParaSel = itemId;
   setVal('search-prod-sel', '');
+  await sincronizarAgora(true);
   renderModalProdutosSel();
   document.getElementById('modal-produtos-sel').classList.add('open');
 }
@@ -2404,7 +2472,7 @@ function confirmarGuardar() {
   registarLog(anterior ? 'COT_EDITAR' : 'COT_CRIAR', 'Cotação', num, `Cliente: ${cot.cliNome || '—'} · Total ${fmt(cot.total)} ${cot.moeda}`);
   fecharModal();
   showToast('Cotação '+num+' guardada!');
-  if (temDB()) dbCall('saveCotacao', { cotacao: cot }).then(r => { if (r && r.ok) setDbStatus(true, 'Cotação sincronizada.'); });
+  if (temDB()) dbCall('saveCotacao', { cotacao: cot }).then(r => { if (r && r.ok) { setDbStatus(true, 'Cotação sincronizada.'); sincronizarAgora(true); } });
 }
 function renderCotList() {
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
@@ -2509,7 +2577,7 @@ function guardarDoc(doc, movs) {
   const i = docs.findIndex(x => x.id === doc.id);
   if (i >= 0) docs[i] = doc; else docs.unshift(doc);
   setDocs(docs);
-  if (temDB()) dbCall('saveDocumento', { documento: doc, movimentos: movs || [] }).then(r => { if (r && r.ok) setDbStatus(true, 'Documento sincronizado.'); });
+  if (temDB()) dbCall('saveDocumento', { documento: doc, movimentos: movs || [] }).then(r => { if (r && r.ok) { setDbStatus(true, 'Documento sincronizado.'); sincronizarAgora(true); } });
 }
 function normDoc(x) {
   const o = Object.assign({}, x);
@@ -2574,8 +2642,10 @@ function recalcVencEmitir() {
   const dias = prazoDeCond(_emitir.cot.cond);
   setVal('em-venc', addDiasISO(gv('em-data') || hojeISO(), dias === null ? 15 : dias));
 }
-function abrirEmitir(tipo, ref) {
+async function abrirEmitir(tipo, ref) {
   if (!pode('emitir')) { showToast('⛔ Sem permissão.'); return; }
+  /* ⚠ Puxa stock fresco do servidor ANTES de verificar disponibilidade */
+  await sincronizarAgora(true);
   let cot;
   if (ref === '__form__') {
     cot = cotacaoDoForm();
@@ -2591,7 +2661,7 @@ function abrirEmitir(tipo, ref) {
   if (tipo === 'FT' && !String(cot.cliNome || '').trim()) { showToast('⚠️ Indique o cliente.'); return; }
   const errosStock = verificarStockItens(cot.items);
   if (errosStock.length) {
-    alert('Stock insuficiente:\n\n' + errosStock.map(e =>
+    alert('Stock insuficiente (dados do servidor):\n\n' + errosStock.map(e =>
       `• ${e.ref} ${e.desc}\n   Precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)} (faltam ${fmt(e.falta)})`
     ).join('\n\n') + '\n\nVá a Produtos → Movimento para repor.\n\nNota: Cotações não têm esta restrição.');
     return;
@@ -2613,15 +2683,17 @@ function abrirEmitir(tipo, ref) {
   document.getElementById('em-stock-alerta').innerHTML = '';
   document.getElementById('modal-emitir').classList.add('open');
 }
-function confirmarEmitir() {
+async function confirmarEmitir() {
   if (!_emitir) return;
   const { tipo, cot } = _emitir;
+  /* ⚠ Segunda verificação contra o servidor imediatamente antes de gravar */
+  await sincronizarAgora(true);
   const num = gv('em-num').trim();
   if (!num) { showToast('⚠️ Indique o número.'); return; }
   const id = docId(tipo, num);
   if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe documento com este número.'); return; }
   const errosStock = verificarStockItens(cot.items);
-  if (errosStock.length) { document.getElementById('em-stock-alerta').innerHTML = htmlAlertaStock(errosStock); showToast('⛔ Stock insuficiente.'); return; }
+  if (errosStock.length) { document.getElementById('em-stock-alerta').innerHTML = htmlAlertaStock(errosStock); showToast('⛔ Stock insuficiente (verificado no servidor).'); return; }
   const total = +cot.total || 0;
   const doc = normDoc({
     id, tipo, num, data: gv('em-data') || hojeISO(), venc: tipo === 'FT' ? gv('em-venc') : '',
@@ -2664,7 +2736,9 @@ function confirmarEmitir() {
   switchTab('documentos');
 }
 let _reciboDe = null;
-function abrirRecibo(idEnc) {
+async function abrirRecibo(idEnc) {
+  /* Puxa saldos frescos do servidor */
+  await sincronizarAgora(true);
   const f = getDocs().find(x => x.id === decodeURIComponent(idEnc));
   if (!f) { showToast('⚠️ Factura não encontrada.'); return; }
   const inf = infoDoc(f, pagosPorFactura());
@@ -2678,8 +2752,9 @@ function abrirRecibo(idEnc) {
   setVal('rc-obs', '');
   document.getElementById('modal-recibo').classList.add('open');
 }
-function confirmarRecibo() {
+async function confirmarRecibo() {
   const f = _reciboDe; if (!f) return;
+  await sincronizarAgora(true);
   const num = gv('rc-num').trim();
   if (!num) { showToast('⚠️ Indique o número.'); return; }
   const id = docId('RC', num);
@@ -2710,8 +2785,9 @@ function previewDoc(idEnc) {
   _docPreview = d;
   switchTab('preview');
 }
-function anularDoc(idEnc) {
+async function anularDoc(idEnc) {
   if (!pode('anular')) { showToast('⛔ Só master/admin.'); return; }
+  await sincronizarAgora(true);
   const docs = getDocs();
   const d = docs.find(x => x.id === decodeURIComponent(idEnc));
   if (!d || d.estado === 'Anulado') return;
@@ -2779,7 +2855,6 @@ function renderDocList() {
 let _docPreview = null;
 function gerarPreview() { document.getElementById('cot-preview').innerHTML = buildDoc(_docPreview || undefined); }
 
-/* Monta a grelha comum de metadados (usada em COT/FT/VD) */
 function metaGrelha(cor, pares) {
   return `<div style="display:grid;grid-template-columns:repeat(${pares.length},1fr);border:1px solid #d0d5dd;border-radius:4px;overflow:hidden;margin-bottom:4mm;font-size:10px">
     ${pares.map(([l,v],i)=>`<div style="padding:4px 7px${i<pares.length-1?';border-right:1px solid #d0d5dd':''}">
@@ -2796,7 +2871,7 @@ function buildDoc(d) {
   const empNome = lsv('emp-nome') || 'Empresa Emissora';
   const empNuit = lsv('emp-nuit'), empEnd = lsv('emp-end'), empTel = lsv('emp-tel'), empEmail = lsv('emp-email'), empCidade = lsv('emp-cidade');
   const cliNome = d.cliNome || '—', cliNuit = d.cliNuit || '', cliEnd = d.cliEnd || '', cliCidade = d.cliCidade || '', cliTel = d.cliTel || '', cliEmail = d.cliEmail || '';
-  const cotNum = d.num || '', cotData = fmtDate(d.data), cotVenc = fmtDate(d.venc);
+  const cotNum = d.num || '', cotData = fmtDate(d.data);
   const cotCond = d.cond || 'Pronto Pagamento', cotTempo = d.tempo || 'Entrega imediata', cotVal = d.validade || '15';
   const moeda = d.moeda || 'MT', rodape = lsv('cfg-rodape') || 'Documento Processado por Computador';
   const cotObs = String(d.obs || '').trim(), itens = d.items || [];
@@ -2823,8 +2898,6 @@ function buildDoc(d) {
   })();
   const nReimp = +d.impressoes || 0;
   const agoraTxt = (() => { const n = new Date(); return fmtDate(dataLocalISO(n)) + ' ' + String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); })();
-
-  /* ═══ Grelha de metadados IGUAL para todos os tipos (COT/FT/VD) ═══ */
   const metaBase = [
     ['Nº Contrib.', esc(empNuit || '—')],
     ['Data', cotData],
@@ -2833,7 +2906,6 @@ function buildDoc(d) {
     ['Cond. Pagamento', esc(cotCond)],
     ['Moeda', esc(moeda)]
   ];
-  /* ═══ Bloco de condições/dados complementares IGUAL para todos ═══ */
   let condTitulo = 'Condições';
   let condHTML = par('Tempo de execução', esc(cotTempo))
                + par('Validade da cotação', esc(String(cotVal)) + ' dias')
@@ -2855,7 +2927,6 @@ function buildDoc(d) {
              + par('Ref. cotação', esc(d.origem || '—'))
              + par('Valor recebido', fmt(total)+' '+moeda);
   }
-
   const htmlTopo = `  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5mm;padding-bottom:4mm;border-bottom:2.5px solid ${cor}">
     <div>${logoHTML}</div>
     <div style="text-align:right">
