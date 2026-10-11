@@ -725,7 +725,7 @@ body.locked{overflow:hidden}
 <script>
 'use strict';
 
-const VERSAO_APP = '2026-10-11-v14';
+const VERSAO_APP = '2026-10-11-v15';
 const _DBC = [104,116,116,112,115,58,47,47,115,99,114,105,112,116,46,103,111,111,103,108,101,46,99,111,109,47,109,97,99,114,111,115,47,115,47,65,75,102,121,99,98,121,89,65,49,118,97,84,90,51,56,77,88,66,107,111,69,121,122,118,80,49,87,87,70,48,75,89,116,83,112,66,97,81,79,105,121,116,104,45,115,71,105,71,52,102,111,49,66,105,102,45,70,71,57,65,65,95,99,81,106,111,112,55,121,65,121,47,101,120,101,99];
 function _dbDef() { return String.fromCharCode.apply(null, _DBC); }
 const _XK = 0x5A;
@@ -883,7 +883,6 @@ function entrarNoSistema() {
   aplicarPermissoes();
   reiniciarTimerInatividade();
   setConnStatus('ok', 'Ligado');
-  // NÃO sincroniza imediatamente — deixa o polling estabilizar
   setTimeout(() => { if (SESSAO) sincronizarTudo(); }, 2000);
   setTimeout(() => {
     if (painelActivo() === 'clientes') renderClientes();
@@ -1049,7 +1048,6 @@ async function dbCallRaw(action, payload) {
     setConnStatus('ok', 'Ligado');
     if (json && json.ok === false) {
       if (json.code === 'AUTH') {
-        // NÃO expulsar em poll/ping/status — só em acções reais
         if (action !== 'poll' && action !== 'ping' && action !== 'status') {
           sessaoExpirada(json.error);
         } else {
@@ -2090,16 +2088,30 @@ function selecionarProduto(prodId) {
   renderItems();
 }
 
+/* ═══════════ VALIDAÇÃO DE STOCK ═══════════ */
 function verificarStockItens(itensArr) {
   const prods = getProdutos();
   const erros = [];
   (itensArr || []).forEach(it => {
-    const p = prods.find(x => String(x.ref||'') === String(it.ref||'') && String(x.desc||'') === String(it.desc||''));
-    if (!p || p.rastrear === 'nao') return;
     const qtd = +it.qtd || 0;
-    const st = +p.stock || 0;
     if (qtd <= 0) return;
-    if (st < qtd) erros.push({ ref: p.ref || p.desc || '—', desc: p.desc || '', precisa: qtd, tem: st, falta: round2(qtd - st), un: p.un || 'Un' });
+    const p = prods.find(x =>
+      String(x.ref || '') === String(it.ref || '') &&
+      String(x.desc || '') === String(it.desc || '')
+    );
+    if (!p) return;
+    if (p.rastrear === 'nao') return;
+    const st = +p.stock || 0;
+    if (st < qtd) {
+      erros.push({
+        ref: p.ref || p.desc || '—',
+        desc: p.desc || '',
+        precisa: qtd,
+        tem: st,
+        falta: round2(qtd - st),
+        un: p.un || 'Un'
+      });
+    }
   });
   return erros;
 }
@@ -2111,6 +2123,7 @@ function htmlAlertaStock(erros) {
   </div>`;
 }
 
+/* ═══════════ GUARDAR COTAÇÃO ═══════════ */
 function validarCotacao() {
   const erros = [], avisos = [];
   const comDesc = items.filter(it => String(it.desc || '').trim());
@@ -2366,9 +2379,13 @@ function abrirEmitir(tipo, ref) {
   const errosStock = verificarStockItens(cot.items);
   if (errosStock.length) {
     alert('Stock insuficiente:\n\n' + errosStock.map(e =>
-      `• ${e.ref} ${e.desc}\n   Precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)}`
-    ).join('\n\n'));
+      `• ${e.ref} ${e.desc}\n   Precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)} (faltam ${fmt(e.falta)})`
+    ).join('\n\n') + '\n\nVá a Produtos → Movimento para repor.');
     return;
+  }
+  if (cot.origem) {
+    const ja = getDocs().filter(d => d.origem === cot.origem && (d.tipo === 'FT' || d.tipo === 'VD') && d.estado !== 'Anulado');
+    if (ja.length && !confirm(`Esta cotação já tem ${ja[0].tipo === 'FT' ? 'a factura' : 'a VD'} ${ja[0].num}. Emitir mesmo assim?`)) return;
   }
   _emitir = { tipo, cot };
   document.getElementById('em-titulo').textContent = tipo === 'FT' ? 'Emitir Factura' : 'Emitir Venda a Dinheiro';
@@ -2390,47 +2407,80 @@ function confirmarEmitir() {
   if (!num) { showToast('⚠️ Indique o número.'); return; }
   const id = docId(tipo, num);
   if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe documento com este número.'); return; }
+
+  // Verificar stock NOVAMENTE
   const errosStock = verificarStockItens(cot.items);
-  if (errosStock.length) { document.getElementById('em-stock-alerta').innerHTML = htmlAlertaStock(errosStock); showToast('⛔ Stock insuficiente.'); return; }
+  if (errosStock.length) {
+    document.getElementById('em-stock-alerta').innerHTML = htmlAlertaStock(errosStock);
+    showToast('⛔ Stock insuficiente.');
+    return;
+  }
+
   const total = +cot.total || 0;
   const doc = normDoc({
     id, tipo, num, data: gv('em-data') || hojeISO(), venc: tipo === 'FT' ? gv('em-venc') : '',
     moeda: cot.moeda || 'MT', cond: tipo === 'VD' ? 'Pronto Pagamento' : (cot.cond || ''),
     metodo: tipo === 'VD' ? gv('em-metodo') : '', origem: cot.origem || '', obs: gv('em-obs'), estado: 'Emitido',
-    cliNome: cot.cliNome || (tipo === 'VD' ? 'Consumidor Final' : ''), cliNuit: cot.cliNuit || '', cliEnd: cot.cliEnd || '',
-    cliCidade: cot.cliCidade || '', cliTel: cot.cliTel || '', cliEmail: cot.cliEmail || '',
+    cliNome: cot.cliNome || (tipo === 'VD' ? 'Consumidor Final' : ''),
+    cliNuit: cot.cliNuit || '', cliEnd: cot.cliEnd || '', cliCidade: cot.cliCidade || '',
+    cliTel: cot.cliTel || '', cliEmail: cot.cliEmail || '',
     items: JSON.parse(JSON.stringify(cot.items || [])),
-    sub: cot.sub, descTipo: cot.descTipo || 'pct', descValor: cot.descValor, desconto: cot.desconto, iva: cot.iva, total,
-    valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
+    sub: cot.sub, descTipo: cot.descTipo || 'pct', descValor: cot.descValor,
+    desconto: cot.desconto, iva: cot.iva, total,
+    valorRecebido: tipo === 'VD' ? total : 0,
+    savedAt: new Date().toISOString(),
+    criadoPor: (SESSAO && SESSAO.username) || '',
+    uid: novoUid(), impressoes: 0
   });
+
+  // ═══ ABATE DE STOCK LOCAL (imediato e fiável) ═══
   const movsStock = [];
   const prods = getProdutos();
+  let algumAbatido = false;
+
   (doc.items || []).forEach(it => {
-    const p = prods.find(x => String(x.ref||'') === String(it.ref||'') && String(x.desc||'') === String(it.desc||''));
-    if (!p || p.rastrear === 'nao') return;
+    const qtd = +it.qtd || 0;
+    if (qtd <= 0) return;
+    const p = prods.find(x =>
+      String(x.ref || '') === String(it.ref || '') &&
+      String(x.desc || '') === String(it.desc || '')
+    );
+    if (!p) return;
+    if (p.rastrear === 'nao') return;
     const antes = +p.stock || 0;
-    const depois = round2(antes - (+it.qtd || 0));
-    movsStock.push({ id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
-      produtoId: p.id, produtoRef: p.ref||'', produtoDesc: p.desc||'',
-      tipo: 'VENDA', qtd: -(+it.qtd || 0), qtdAntes: antes, qtdDepois: depois,
-      motivo: `${doc.tipo} ${doc.num}`, refDoc: doc.id, obs: '', origem: 'app' });
-    p.stock = depois; p.stockAtualizadoEm = new Date().toISOString();
+    const depois = round2(antes - qtd);
+    p.stock = depois;
+    p.stockAtualizadoEm = new Date().toISOString();
+    algumAbatido = true;
+    movsStock.push({
+      id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
+      produtoId: p.id, produtoRef: p.ref || '', produtoDesc: p.desc || '',
+      tipo: 'VENDA', qtd: -qtd, qtdAntes: antes, qtdDepois: depois,
+      motivo: `${doc.tipo} ${doc.num}`, refDoc: doc.id, obs: '', origem: 'app'
+    });
+    registarLog('STOCK_VENDA', 'Produto', p.ref || p.desc || '—', `-${qtd} · ${antes} → ${depois} · ${doc.tipo} ${doc.num}`);
   });
-  if (movsStock.length) {
+
+  if (algumAbatido) {
     setProdutos(prods);
-    const ms = getMovs(); setMovs(movsStock.concat(ms));
-    movsStock.forEach(m => registarLog('STOCK_VENDA', 'Produto', m.produtoRef, `${m.qtd} · ${m.qtdAntes} → ${m.qtdDepois}`));
+    const ms = getMovs();
+    setMovs(movsStock.concat(ms));
   }
+
+  // Guardar documento (local + servidor)
   guardarDoc(doc, movsStock);
+
   if (tipo === 'FT' && doc.cliNome && doc.cliNome.trim()) registarClienteAuto(doc);
-  registarLog('DOC_EMITIR', TIPOS_DOC[tipo].nome, num, `Cliente: ${doc.cliNome || '—'} · Total ${fmt(doc.total)} ${doc.moeda}`);
+  registarLog('DOC_EMITIR', TIPOS_DOC[tipo].nome, num, `Cliente: ${doc.cliNome || '—'} · Total ${fmt(doc.total)} ${doc.moeda}${algumAbatido ? ' · stock abatido' : ''}`);
   registarSeqDoc(tipo, seqDeNum(num));
+
   fecharModal();
   _emitir = null;
-  showToast(`${TIPOS_DOC[tipo].nome} ${num} emitida.`);
+  showToast(`${TIPOS_DOC[tipo].nome} ${num} emitida.${algumAbatido ? ' Stock actualizado.' : ''}`);
   escolherTipoDoc('COT');
   switchTab('documentos');
-  setTimeout(sincronizarTudo, 800);
+
+  setTimeout(sincronizarTudo, 500);
 }
 let _reciboDe = null;
 function abrirRecibo(idEnc) {
@@ -2472,7 +2522,7 @@ function confirmarRecibo() {
   showToast(`Recibo ${num} emitido.`);
   escolherTipoDoc('COT');
   renderDocList();
-  setTimeout(sincronizarTudo, 800);
+  setTimeout(sincronizarTudo, 500);
 }
 function previewDoc(idEnc) {
   const d = getDocs().find(x => x.id === decodeURIComponent(idEnc));
@@ -2488,27 +2538,46 @@ function anularDoc(idEnc) {
   if (d.tipo === 'FT' && docs.some(r => r.tipo === 'RC' && r.facturaId === d.id && r.estado !== 'Anulado')) { alert('Esta factura tem recibos. Anule primeiro os recibos.'); return; }
   if (!confirm(`Anular ${TIPOS_DOC[d.tipo].nome} ${d.num}?`)) return;
   d.estado = 'Anulado'; d.anuladoEm = new Date().toISOString();
+
+  // ═══ REPOR STOCK LOCAL ═══
   const movsStock = [];
+  let algumReposto = false;
   if (d.tipo === 'FT' || d.tipo === 'VD') {
     const prods = getProdutos();
     (d.items || []).forEach(it => {
-      const p = prods.find(x => String(x.ref||'') === String(it.ref||'') && String(x.desc||'') === String(it.desc||''));
-      if (!p || p.rastrear === 'nao') return;
+      const qtd = +it.qtd || 0;
+      if (qtd <= 0) return;
+      const p = prods.find(x =>
+        String(x.ref || '') === String(it.ref || '') &&
+        String(x.desc || '') === String(it.desc || '')
+      );
+      if (!p) return;
+      if (p.rastrear === 'nao') return;
       const antes = +p.stock || 0;
-      const depois = round2(antes + (+it.qtd || 0));
-      movsStock.push({ id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
-        produtoId: p.id, produtoRef: p.ref||'', produtoDesc: p.desc||'',
-        tipo: 'ANULACAO', qtd: +(+it.qtd || 0), qtdAntes: antes, qtdDepois: depois,
-        motivo: 'Anulação ' + d.tipo + ' ' + d.num, refDoc: d.id, obs: '', origem: 'app' });
-      p.stock = depois; p.stockAtualizadoEm = new Date().toISOString();
+      const depois = round2(antes + qtd);
+      p.stock = depois;
+      p.stockAtualizadoEm = new Date().toISOString();
+      algumReposto = true;
+      movsStock.push({
+        id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
+        produtoId: p.id, produtoRef: p.ref || '', produtoDesc: p.desc || '',
+        tipo: 'ANULACAO', qtd: qtd, qtdAntes: antes, qtdDepois: depois,
+        motivo: 'Anulação ' + d.tipo + ' ' + d.num, refDoc: d.id, obs: '', origem: 'app'
+      });
+      registarLog('STOCK_ANULACAO', 'Produto', p.ref || p.desc || '—', `+${qtd} · ${antes} → ${depois} · ${d.tipo} ${d.num}`);
     });
-    if (movsStock.length) { setProdutos(prods); const ms = getMovs(); setMovs(movsStock.concat(ms)); }
+    if (algumReposto) {
+      setProdutos(prods);
+      const ms = getMovs();
+      setMovs(movsStock.concat(ms));
+    }
   }
+
   guardarDoc(d, movsStock);
-  registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, 'Total ' + fmt(d.total));
+  registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, 'Total ' + fmt(d.total) + (algumReposto ? ' · stock reposto' : ''));
   renderDocList();
-  showToast('Documento anulado.');
-  setTimeout(sincronizarTudo, 800);
+  showToast('Documento anulado.' + (algumReposto ? ' Stock reposto.' : ''));
+  setTimeout(sincronizarTudo, 500);
 }
 function renderDocList() {
   const wrap = document.getElementById('doc-list-wrap');
