@@ -243,9 +243,9 @@ body.locked{overflow:hidden}
   <div class="section-title">Informações da Cotação</div>
   <div class="form-grid c4">
     <div class="field"><label>Nº Cotação</label><input type="text" id="cot-num" placeholder="0001/18062026"></div>
-    <div class="field"><label>Data</label><input type="date" id="cot-data"></div>
-    <div class="field"><label>Vencimento</label><input type="date" id="cot-venc"></div>
-    <div class="field"><label>Validade (dias)</label><input type="number" id="cot-validade" value="15" min="1"></div>
+    <div class="field"><label>Data</label><input type="date" id="cot-data" onchange="recalcVenc()"></div>
+    <div class="field"><label>Vencimento</label><input type="date" id="cot-venc" onchange="recalcValidade()"></div>
+    <div class="field"><label>Validade (dias)</label><input type="number" id="cot-validade" value="15" min="1" oninput="recalcVenc()"></div>
   </div>
   <div class="form-grid c3" style="margin-top:10px">
     <div class="field">
@@ -613,8 +613,8 @@ body.locked{overflow:hidden}
     <div class="alert alert-info" id="em-info" style="font-size:12px"></div>
     <div class="form-grid" style="gap:10px">
       <div class="field"><label>Nº do Documento</label><input type="text" id="em-num"></div>
-      <div class="field"><label>Data</label><input type="date" id="em-data"></div>
-      <div class="field" id="em-venc-wrap"><label>Vencimento</label><input type="date" id="em-venc"></div>
+      <div class="field"><label>Data</label><input type="date" id="em-data" onchange="recalcVencEmitir()"></div>
+      <div class="field" id="em-venc-wrap"><label>Vencimento</label><input type="date" id="em-venc" onchange="_vencManual = true"></div>
       <div class="field" id="em-metodo-wrap"><label>Método de Pagamento</label>
         <select id="em-metodo"><option>Numerário</option><option>M-Pesa</option><option>e-Mola</option><option>mKesh</option><option>POS / Cartão</option><option>Transferência Bancária</option><option>Cheque</option></select>
       </div>
@@ -1261,6 +1261,7 @@ async function diagnosticoDB() {
     `Script versão: ${r.versao}\nSheet: ${r.planilha}\n\n` +
     `Folha usada → registos lidos:\n` +
     Object.keys(r.usadas).map(t => `  ${t}: "${r.usadas[t]}" → ${r.contagens[t]}`).join('\n') +
+    `\n\nArmazenamento local usado: ${(usoArmazenamentoLocal() / 1048576).toFixed(2)} MB (limite típico do navegador: ~5 MB)` +
     `\n\nNeste dispositivo: ${loc('cotacoes')} cotações · ${loc('clientes')} clientes · ${loc('produtos')} produtos · ${loc('documentos')} documentos\n\n` +
     `Folhas existentes na Sheet:\n` +
     r.folhas.map(f => `  • "${f.nome}" (${f.linhas} linhas)\n      colunas: ${f.cabecalho.join(' | ') || '(vazia)'}`).join('\n');
@@ -1326,13 +1327,13 @@ async function sincronizarTudo() {
   // Clientes
   if (Array.isArray(r.clientes)) {
     if (r.clientes.length || !localDe('clientes').length) {
-      localStorage.setItem('clientes', JSON.stringify(r.clientes.map(c => ({...c, id: normId(c.id)}))));
+      localStorage.setItem('clientes', JSON.stringify(r.clientes.map(c => ({...c, nome: String(c.nome == null ? '' : c.nome), id: normId(c.id)}))));
     } else { avisos.push('clientes'); localDe('clientes').forEach(c => dbCall('saveCliente', { cliente: c })); }
   }
   // Produtos
   if (Array.isArray(r.produtos)) {
     if (r.produtos.length || !localDe('produtos').length) {
-      localStorage.setItem('produtos', JSON.stringify(r.produtos.map(p => ({...p, id: normId(p.id), pu: +p.pu||0, iva: +p.iva||0}))));
+      localStorage.setItem('produtos', JSON.stringify(r.produtos.map(p => ({...p, ref: String(p.ref == null ? '' : p.ref), desc: String(p.desc == null ? '' : p.desc), un: p.un || 'Un', id: normId(p.id), pu: +p.pu||0, iva: +p.iva||0}))));
     } else { avisos.push('produtos'); localDe('produtos').forEach(p => dbCall('saveProduto', { produto: p })); }
   }
   // Cotações
@@ -1385,6 +1386,28 @@ async function sincronizarTudo() {
 
 // IDs vindos da Sheet podem chegar como número (Google Sheets converte strings numéricas) — normaliza para string/number consistente
 function normId(id) { return (typeof id === 'number') ? id : (isNaN(+id) ? id : +id); }
+
+/* ────────── ARMAZENAMENTO LOCAL: avisa se o navegador ficar sem espaço (os dados não seriam gravados) */
+(function () {
+  const original = Storage.prototype.setItem;
+  let avisado = false;
+  Storage.prototype.setItem = function (k, v) {
+    try { return original.call(this, k, v); }
+    catch (e) {
+      if (!avisado) {
+        avisado = true;
+        setTimeout(() => { avisado = false; }, 30000);
+        alert('⚠️ O armazenamento do navegador está cheio — as últimas alterações NÃO foram guardadas neste dispositivo.\n\nSugestões: reduza o tamanho do logotipo, sincronize com a Base de Dados e liberte espaço (limpar dados antigos do navegador).');
+      }
+      throw e;
+    }
+  };
+})();
+function usoArmazenamentoLocal() {
+  let b = 0;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); b += (k.length + (localStorage.getItem(k) || '').length) * 2; } } catch (e) {}
+  return b;
+}
 
 /* ────────── INIT */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1483,10 +1506,45 @@ function dataLocalISO(date) {
 }
 
 function setDefaultDates() {
-  const h = new Date();
-  document.getElementById('cot-data').value = dataLocalISO(h);
-  const v = new Date(h); v.setDate(v.getDate()+15);
-  document.getElementById('cot-venc').value = dataLocalISO(v);
+  document.getElementById('cot-data').value = dataLocalISO(new Date());
+  recalcVenc();
+}
+
+/* ────────── Datas e prazos (cálculo automático) */
+// Soma dias a uma data AAAA-MM-DD (ao meio-dia, para nunca sofrer com mudanças de hora)
+function addDiasISO(iso, dias) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return '';
+  const d = new Date(+m[1], +m[2] - 1, +m[3], 12, 0, 0);
+  d.setDate(d.getDate() + (parseInt(dias, 10) || 0));
+  return dataLocalISO(d);
+}
+function diasEntre(deISO, ateISO) {
+  const a = String(deISO || '').match(/^(\d{4})-(\d{2})-(\d{2})/), b = String(ateISO || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!a || !b) return null;
+  return Math.round((new Date(+b[1], +b[2] - 1, +b[3], 12) - new Date(+a[1], +a[2] - 1, +a[3], 12)) / 86400000);
+}
+// Data (ou Validade) mudou → Vencimento = Data + Validade
+function recalcVenc() {
+  const data = gv('cot-data'), dias = parseInt(gv('cot-validade'), 10);
+  if (data && dias > 0) document.getElementById('cot-venc').value = addDiasISO(data, dias);
+}
+// Vencimento mudou → Validade = dias entre a Data e o Vencimento
+function recalcValidade() {
+  const data = gv('cot-data'), venc = gv('cot-venc');
+  if (!data || !venc) return;
+  const n = diasEntre(data, venc);
+  if (n === null) return;
+  if (n < 1) { showToast('⚠️ O vencimento tem de ser depois da data da cotação.'); recalcVenc(); return; }
+  document.getElementById('cot-validade').value = n;
+}
+// Condição de pagamento → prazo em dias ("30 dias" → 30; "Pronto pagamento" → 0; outro texto → null)
+function prazoDeCond(txt) {
+  const t = String(txt || '');
+  const m = t.match(/(\d{1,3})\s*(dias?|d\b)/i);
+  if (m) return +m[1];
+  if (/pronto|vista|contado|numer[aá]rio|imediat/i.test(t)) return 0;
+  return null;
 }
 
 /* Numeração sequencial segura: nunca recua. O próximo número é sempre
@@ -1636,45 +1694,47 @@ function updateItem(id, field, val) {
   calcTotals();
 }
 
-function calcLiq(it) { return it.qtd * it.pu; }
+function round2(x) { return Math.round(((+x || 0) + Number.EPSILON) * 100) / 100; }
+// Valor líquido da linha, arredondado a 2 casas (valores negativos contam como 0)
+function calcLiq(it) { return round2(Math.max(0, +it.qtd || 0) * Math.max(0, +it.pu || 0)); }
+
+/* ÚNICA fonte de verdade dos totais (formulário, pré-visualização, PDF, gravação e resumos):
+   cada linha é arredondada a 2 casas; o desconto é proporcional; o IVA é calculado por taxa
+   sobre a base já com desconto e arredondado — por isso Sub-Total − Desconto + IVA = Total, sempre. */
+function calcTotaisDoc(itens, descTipo, descValor) {
+  const linhas = (itens || []).map(it => ({ liq: calcLiq(it), iva: +it.iva || 0 }));
+  const sub = round2(linhas.reduce((a, l) => a + l.liq, 0));
+  const dv = Math.max(0, parseFloat(descValor) || 0);
+  let desconto = (descTipo || 'pct') === 'pct' ? sub * (Math.min(dv, 100) / 100) : dv;
+  desconto = round2(Math.min(desconto, sub));
+  const fator = sub > 0 ? (sub - desconto) / sub : 1;
+  const porTaxa = {};
+  linhas.forEach(l => { const t = porTaxa[l.iva] = porTaxa[l.iva] || { base: 0, iva: 0 }; t.base += l.liq * fator; });
+  let iva = 0;
+  Object.keys(porTaxa).forEach(r => { const t = porTaxa[r]; t.base = round2(t.base); t.iva = round2(t.base * (+r) / 100); iva += t.iva; });
+  iva = round2(iva);
+  return { sub, desconto, iva, total: round2(sub - desconto + iva), porTaxa };
+}
 
 function calcTotals() {
-  let sub=0, ivaBruto=0;
-  items.forEach(it => { const b=calcLiq(it); sub+=b; ivaBruto+=b*(it.iva/100); });
-
   const descTipo  = gv('cot-desc-tipo') || 'pct';
   const descValor = parseFloat(gv('cot-desc-valor')) || 0;
-  let desconto = descTipo === 'pct' ? sub * (descValor/100) : descValor;
-  if (desconto < 0) desconto = 0;
-  if (desconto > sub) desconto = sub; // nunca desconta mais que o subtotal
-
-  // o IVA é recalculado proporcionalmente sobre o valor líquido após desconto
-  const fatorDesc = sub > 0 ? (sub - desconto) / sub : 1;
-  const iva = ivaBruto * fatorDesc;
-  const total = (sub - desconto) + iva;
-
+  const T = calcTotaisDoc(items, descTipo, descValor);
   const moeda = gv('cot-moeda') || 'MT';
-  document.getElementById('t-sub').textContent   = fmt(sub);
-  document.getElementById('t-desc').textContent  = (desconto>0?'- ':'') + fmt(desconto);
+  document.getElementById('t-sub').textContent   = fmt(T.sub);
+  document.getElementById('t-desc').textContent  = (T.desconto>0?'- ':'') + fmt(T.desconto);
   document.getElementById('t-desc-label').textContent = descTipo==='pct' && descValor>0 ? ' ('+descValor+'%)' : '';
-  document.getElementById('t-iva').textContent   = fmt(iva);
-  document.getElementById('t-total').textContent = fmt(total) + ' ' + moeda;
-  document.getElementById('t-extenso').textContent = valorPorExtenso(total, moeda);
+  document.getElementById('t-iva').textContent   = fmt(T.iva);
+  document.getElementById('t-total').textContent = fmt(T.total) + ' ' + moeda;
+  document.getElementById('t-extenso').textContent = valorPorExtenso(T.total, moeda);
 }
 
 // Devolve os totais já com desconto aplicado, usado em guardar/preview/PDF
 function calcTotaisComDesconto() {
-  let sub=0, ivaBruto=0;
-  items.forEach(it => { const b=calcLiq(it); sub+=b; ivaBruto+=b*(it.iva/100); });
   const descTipo  = gv('cot-desc-tipo') || 'pct';
   const descValor = parseFloat(gv('cot-desc-valor')) || 0;
-  let desconto = descTipo === 'pct' ? sub * (descValor/100) : descValor;
-  if (desconto < 0) desconto = 0;
-  if (desconto > sub) desconto = sub;
-  const fatorDesc = sub > 0 ? (sub - desconto) / sub : 1;
-  const iva = ivaBruto * fatorDesc;
-  const total = (sub - desconto) + iva;
-  return { sub, desconto, descTipo, descValor, iva, total };
+  const T = calcTotaisDoc(items, descTipo, descValor);
+  return { sub: T.sub, desconto: T.desconto, descTipo, descValor, iva: T.iva, total: T.total };
 }
 
 /* ────────── CONFIG */
@@ -1845,7 +1905,7 @@ function guardarCliente() {
   if (!nome) { showToast('⚠️ Indique o nome do cliente primeiro.'); return; }
   const clientes = JSON.parse(localStorage.getItem('clientes')||'[]');
   const cli = {id:Date.now(), nome, nuit:gv('cli-nuit'), end:gv('cli-end'), cidade:gv('cli-cidade'), tel:gv('cli-tel'), email:gv('cli-email')};
-  const idx = clientes.findIndex(c=>c.nome.toLowerCase()===nome.toLowerCase());
+  const idx = clientes.findIndex(c=>String(c.nome||'').toLowerCase()===nome.toLowerCase());
   if (idx>=0) { cli.id = clientes[idx].id; clientes[idx]=cli; } else clientes.unshift(cli);
   localStorage.setItem('clientes', JSON.stringify(clientes));
   showToast('✅ Cliente guardado!');
@@ -1872,8 +1932,8 @@ function renderModalClientes() {
       <div class="modal-item-name">${esc(c.nome)}</div>
       <div class="modal-item-detail">${[c.nuit?'NUIT: '+c.nuit:'', c.tel, c.cidade].filter(Boolean).join(' · ')}</div>
       <div class="modal-item-actions">
-        <button class="btn btn-primary btn-sm" onclick="selecionarCliente(${c.id})">Seleccionar</button>
-        <button class="btn btn-danger btn-sm" onclick="apagarCliente(${c.id})">✕</button>
+        <button class="btn btn-primary btn-sm" onclick="selecionarCliente(${jsqId(c.id)})">Seleccionar</button>
+        <button class="btn btn-danger btn-sm" onclick="apagarCliente(${jsqId(c.id)})">✕</button>
       </div>
     </div>`).join('')+'</div>';
 }
@@ -1903,17 +1963,19 @@ function guardarProdutosDaCotacao() {
   // Auto-save all items as products if they have ref+desc
   let prods = getProdutos();
   const alterados = [];
+  // Só ADICIONA produtos novos. Produtos que já existem no catálogo NÃO são alterados:
+  // um preço especial dado a um cliente numa cotação não deve mudar o preço para todos.
   items.forEach(it => {
-    if (!it.ref.trim() && !it.desc.trim()) return;
-    const key = (it.ref+it.desc).toLowerCase().trim();
-    if (!key) return;
-    const existe = prods.findIndex(p => (p.ref+p.desc).toLowerCase().trim() === key);
-    const prod = {id: existe>=0 ? prods[existe].id : Date.now()+Math.random(), ref:it.ref, desc:it.desc, un:it.un, pu:it.pu, iva:it.iva};
-    if (existe>=0) prods[existe]=prod; else prods.unshift(prod);
+    const ref = String(it.ref == null ? '' : it.ref).trim(), desc = String(it.desc == null ? '' : it.desc).trim();
+    if (!ref && !desc) return;
+    const key = (ref + desc).toLowerCase();
+    if (prods.some(p => (String(p.ref || '') + String(p.desc || '')).toLowerCase().trim() === key)) return;
+    const prod = {id: Date.now() + Math.floor(Math.random() * 1000), ref, desc, un:it.un, pu:it.pu, iva:it.iva};
+    prods.unshift(prod);
     alterados.push(prod);
   });
   setProdutos(prods);
-  if (alterados.length) registarLog('PROD_AUTO', 'Produto', '', `${alterados.length} produto(s) actualizados a partir da cotação ${gv('cot-num')}`);
+  if (alterados.length) registarLog('PROD_AUTO', 'Produto', '', `${alterados.length} produto(s) novo(s) adicionados ao catálogo a partir da cotação ${gv('cot-num')}`);
   if (temDB()) alterados.forEach(p => dbCall('saveProduto', { produto: p }));
 }
 
@@ -1936,8 +1998,8 @@ function renderProdList() {
             <div style="font-size:11px;color:var(--muted)">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%</div>
           </div>
           <div style="display:flex;gap:5px;margin-left:8px">
-            <button class="btn btn-warning btn-sm" onclick="editarProduto(${p.id})">✏️</button>
-            <button class="btn btn-danger btn-sm" onclick="apagarProduto(${p.id})">✕</button>
+            <button class="btn btn-warning btn-sm" onclick="editarProduto(${jsqId(p.id)})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="apagarProduto(${jsqId(p.id)})">✕</button>
           </div>
         </div>
       </div>`).join('')}
@@ -1956,8 +2018,8 @@ function filtrarProdList(q) {
           <div style="font-size:11px;color:var(--muted)">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%</div>
         </div>
         <div style="display:flex;gap:5px;margin-left:8px">
-          <button class="btn btn-warning btn-sm" onclick="editarProduto(${p.id})">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="apagarProduto(${p.id})">✕</button>
+          <button class="btn btn-warning btn-sm" onclick="editarProduto(${jsqId(p.id)})">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="apagarProduto(${jsqId(p.id)})">✕</button>
         </div>
       </div>
     </div>`).join('');
@@ -2034,7 +2096,7 @@ function renderModalProdutosSel() {
     wrap.innerHTML='<p style="text-align:center;color:var(--muted);padding:16px">Nenhum produto encontrado.</p>'; return;
   }
   wrap.innerHTML='<div class="modal-item-grid">'+prods.map(p=>`
-    <div class="modal-item-card" onclick="selecionarProduto(${p.id})">
+    <div class="modal-item-card" onclick="selecionarProduto(${jsqId(p.id)})">
       <div class="modal-item-name">${esc(p.ref)||'—'} — ${esc(p.desc)||'—'}</div>
       <div class="modal-item-detail">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%</div>
     </div>`).join('')+'</div>';
@@ -2052,9 +2114,34 @@ function selecionarProduto(prodId) {
 }
 
 /* ────────── GUARDAR COTAÇÃO */
+// Valida a cotação do formulário. Devolve { erros: [...], avisos: [...] }
+function validarCotacao() {
+  const erros = [], avisos = [];
+  const comDesc = items.filter(it => String(it.desc || '').trim());
+  if (!comDesc.length) erros.push('Adicione pelo menos um item com descrição.');
+  if (items.some(it => (+it.qtd || 0) < 0 || (+it.pu || 0) < 0)) erros.push('Há itens com quantidade ou preço negativos.');
+  if (comDesc.some(it => !((+it.qtd || 0) > 0))) erros.push('Há itens com quantidade zero.');
+  const data = gv('cot-data'), venc = gv('cot-venc');
+  if (!data) erros.push('Indique a data da cotação.');
+  else if (venc && diasEntre(data, venc) < 0) erros.push('O vencimento não pode ser anterior à data da cotação.');
+  if (!(parseInt(gv('cot-validade'), 10) > 0)) erros.push('Indique a validade em dias (mínimo 1).');
+  const dv = parseFloat(gv('cot-desc-valor')) || 0;
+  if (dv < 0) erros.push('O desconto não pode ser negativo.');
+  if (gv('cot-desc-tipo') === 'pct' && dv > 100) erros.push('O desconto em percentagem não pode passar de 100%.');
+  if (!erros.length) {
+    if (comDesc.some(it => !((+it.pu || 0) > 0))) avisos.push('Há itens com preço zero.');
+    if (calcTotaisDoc(items, gv('cot-desc-tipo'), gv('cot-desc-valor')).total <= 0) avisos.push('O total da cotação é zero.');
+    if (!gv('cli-nome').trim()) avisos.push('Não indicou o cliente.');
+  }
+  return { erros, avisos };
+}
+
 function guardarCotacao() {
   const num = gv('cot-num').trim();
   if (!num) { showToast('⚠️ Indique o número da cotação.'); return; }
+  const v = validarCotacao();
+  if (v.erros.length) { alert('Não é possível guardar:\n\n• ' + v.erros.join('\n• ')); return; }
+  if (v.avisos.length && !confirm('Atenção:\n\n• ' + v.avisos.join('\n• ') + '\n\nGuardar mesmo assim?')) return;
   const cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
   const info = document.getElementById('guardar-info');
   info.style.display='none';
@@ -2127,11 +2214,11 @@ function renderCotList() {
       <div class="cot-card-total">${fmt(c.total)} ${c.moeda}</div>
       <div class="cot-card-actions">
         ${pode('emitir') ? badgeFacturada(c.num) : ''}
-        ${pode('emitir') ? `<button class="btn btn-warning btn-sm" title="Gerar Factura desta cotação" onclick="abrirEmitir('FT','${esc(c.num)}')">🧾 Facturar</button>
-        <button class="btn btn-warning btn-sm" title="Gerar Venda a Dinheiro desta cotação" onclick="abrirEmitir('VD','${esc(c.num)}')">💵 VD</button>` : ''}
-        <button class="btn btn-primary btn-sm" onclick="carregarCotacao('${esc(c.num)}')">✏️ Editar</button>
-        <button class="btn btn-success btn-sm" onclick="previewCotacao('${esc(c.num)}')">👁️</button>
-        ${pode('apagarCot') ? `<button class="btn btn-danger btn-sm" onclick="apagarCotacao('${esc(c.num)}')">🗑️</button>` : ''}
+        ${pode('emitir') ? `<button class="btn btn-warning btn-sm" title="Gerar Factura desta cotação" onclick="abrirEmitir('FT',${jsq(c.num)})">🧾 Facturar</button>
+        <button class="btn btn-warning btn-sm" title="Gerar Venda a Dinheiro desta cotação" onclick="abrirEmitir('VD',${jsq(c.num)})">💵 VD</button>` : ''}
+        <button class="btn btn-primary btn-sm" onclick="carregarCotacao(${jsq(c.num)})">✏️ Editar</button>
+        <button class="btn btn-success btn-sm" onclick="previewCotacao(${jsq(c.num)})">👁️</button>
+        ${pode('apagarCot') ? `<button class="btn btn-danger btn-sm" onclick="apagarCotacao(${jsq(c.num)})">🗑️</button>` : ''}
       </div>
     </div>`).join('')+'</div>';
 }
@@ -2251,16 +2338,10 @@ function buildDoc(d) {
   const cotObs   = String(d.obs || '').trim();
   const itens    = d.items || [];
 
-  let sub=0, ivaBruto=0;
-  itens.forEach(it=>{ const b=calcLiq(it); sub+=b; ivaBruto+=b*(it.iva/100); });
   const descTipo  = d.descTipo || 'pct';
   const descValor = parseFloat(d.descValor) || 0;
-  let desconto = descTipo === 'pct' ? sub * (descValor/100) : descValor;
-  if (desconto < 0) desconto = 0;
-  if (desconto > sub) desconto = sub;
-  const fatorDesc = sub > 0 ? (sub - desconto) / sub : 1;
-  const ivaTotal = ivaBruto * fatorDesc;
-  const total = (sub - desconto) + ivaTotal;
+  const TT = calcTotaisDoc(itens, descTipo, descValor);
+  const sub = TT.sub, desconto = TT.desconto, ivaTotal = TT.iva, total = TT.total;
   const descLabel = descTipo === 'pct' && descValor > 0 ? `Desconto (${fmt(descValor)}%)` : 'Desconto Financeiro';
 
   const logoHTML = logoData
@@ -2470,47 +2551,45 @@ function valorPorExtenso(valor, moeda) {
     ZAR: ['Rand','Rands','Cêntimo','Cêntimos'],
   };
   const nm = nomesMoeda[moeda] || ['Unidade','Unidades','Centavo','Centavos'];
-  const inteiro = Math.floor(valor);
-  const cents   = Math.round((valor - inteiro) * 100);
+  let v = Number(valor); if (!isFinite(v)) v = 0;
+  const negativo = v < 0;
+  const centimos = Math.round(Math.abs(v) * 100);          // arredonda ANTES de separar inteiro e cêntimos
+  const inteiro = Math.floor(centimos / 100), cents = centimos % 100;
 
   const ext = numExtenso(inteiro);
-  const moedaNome = inteiro===1 ? nm[0] : nm[1];
-  let res = ext + ' ' + moedaNome;
-  if (cents > 0) {
-    const extC = numExtenso(cents);
-    const centNome = cents===1 ? nm[2] : nm[3];
-    res += ' e ' + extC + ' ' + centNome;
-  }
+  // "Um milhão de Meticais", "Dois milhões de Meticais" (múltiplos exactos de milhão)
+  const de = inteiro >= 1000000 && inteiro % 1000000 === 0 ? ' de' : '';
+  let res = (negativo && centimos > 0 ? 'menos ' : '') + ext + de + ' ' + (inteiro === 1 ? nm[0] : nm[1]);
+  if (cents > 0) res += ' e ' + numExtenso(cents) + ' ' + (cents === 1 ? nm[2] : nm[3]);
   return res.charAt(0).toUpperCase() + res.slice(1);
 }
 
 function numExtenso(n) {
-  if (n===0) return 'zero';
+  if (n === 0) return 'zero';
   const un  = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove',
                 'dez','onze','doze','treze','catorze','quinze','dezasseis','dezassete','dezoito','dezanove'];
   const dez = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
-  const cen = ['','cem','duzentos','trezentos','quatrocentos','quinhentos',
-                'seiscentos','setecentos','oitocentos','novecentos'];
+  const cen = ['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+  // "e" liga o último grupo quando este é "simples": menor que 100 ou centena redonda
+  // (ex.: mil e um, mil e cem, dois mil e quinhentos; mas: mil cento e um, mil duzentos e trinta)
+  const simples = r => r < 1000 ? (r < 100 || r % 100 === 0)
+                    : r % 1000 === 0 && r < 1000000 ? simples(r / 1000)
+                    : r % 1000000 === 0 ? simples(r / 1000000) : false;
+  const liga = r => (simples(r) ? ' e ' : ' ') + numExtenso(r);
   if (n < 20)  return un[n];
   if (n < 100) return dez[Math.floor(n/10)] + (n%10 ? ' e '+un[n%10] : '');
   if (n === 100) return 'cem';
-  if (n < 1000) {
-    const c = Math.floor(n/100), r = n%100;
-    return cen[c] + (r ? ' e '+numExtenso(r) : '');
-  }
+  if (n < 1000) { const c = Math.floor(n/100), r = n%100; return cen[c] + (r ? ' e '+numExtenso(r) : ''); }
   if (n < 1000000) {
     const m = Math.floor(n/1000), r = n%1000;
-    const prefix = m===1 ? 'mil' : numExtenso(m)+' mil';
-    return prefix + (r ? (r<100 ? ' e '+numExtenso(r) : ' '+numExtenso(r)) : '');
+    return (m === 1 ? 'mil' : numExtenso(m) + ' mil') + (r ? liga(r) : '');
   }
   if (n < 1000000000) {
     const m = Math.floor(n/1000000), r = n%1000000;
-    const prefix = m===1 ? 'um milhão' : numExtenso(m)+' milhões';
-    return prefix + (r ? ' e '+numExtenso(r) : '');
+    return (m === 1 ? 'um milhão' : numExtenso(m) + ' milhões') + (r ? liga(r) : '');
   }
   const m = Math.floor(n/1000000000), r = n%1000000000;
-  const prefix = m===1 ? 'um bilião' : numExtenso(m)+' biliões';
-  return prefix + (r ? ' e '+numExtenso(r) : '');
+  return (m === 1 ? 'mil milhões' : numExtenso(m) + ' mil milhões') + (r ? liga(r) : '');
 }
 
 /* ────────── PDF EXPORT (vetorial — usa o motor de impressão do browser
@@ -2564,7 +2643,7 @@ function exportarPDF() {
     }
   `;
 
-  const win = window.open('', '_blank', 'width=900,height:1100');
+  const win = window.open('', '_blank', 'width=900,height=1100');
   if (!win) {
     showToast('⚠️ O browser bloqueou a janela de impressão. Permita pop-ups para este site e tente novamente.');
     return;
@@ -2577,7 +2656,10 @@ function exportarPDF() {
   win.document.close();
 
   // espera imagens (logo) e layout estarem prontos antes de imprimir
+  let _impresso = false;
   const triggerPrint = () => {
+    if (_impresso) return;          // evita abrir a janela de impressão duas vezes
+    _impresso = true;
     win.focus();
     win.print();
   };
@@ -2656,7 +2738,10 @@ document.addEventListener('click', e => {
 /* ────────── UTILS */
 function gv(id)  { return (document.getElementById(id)||{}).value||''; }
 function lsv(k)  { return localStorage.getItem(k)||''; }
-function esc(s)  { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// Literal JS seguro para usar dentro de onclick="..." (aguenta aspas, apóstrofos e símbolos)
+function jsq(v) { return esc(JSON.stringify(String(v == null ? '' : v))).replace(/'/g, '&#39;'); }
+function jsqId(v) { return (typeof v === 'number' && isFinite(v)) ? String(v) : jsq(v); }
+function esc(s)  { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function fmt(n)  { return (Number(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,'.').replace(/\.(\d+)$/,',$1'); }
 function fmtDate(s){
   if(!s) return '—';
@@ -2699,7 +2784,6 @@ const NUM_DOC_CAMPOS = ['sub','desconto','descValor','iva','total','valorRecebid
 function novoUid() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10); }
 let _impressoesForm = 0;   // impressões da cotação do formulário ainda não guardada
 
-function round2(x) { return Math.round((+x || 0) * 100) / 100; }
 function hojeISO() { return dataLocalISO(new Date()); }
 
 function dadosDoForm() {
@@ -2812,7 +2896,13 @@ function badgeFacturada(num) {
 }
 
 /* ────────── Emitir FACTURA / VD a partir de uma cotação */
-let _emitir = null;
+let _emitir = null, _vencManual = false;
+// Vencimento da factura = data de emissão + dias da condição de pagamento (por defeito 15 dias)
+function recalcVencEmitir() {
+  if (!_emitir || _emitir.tipo !== 'FT' || _vencManual) return;
+  const dias = prazoDeCond(_emitir.cot.cond);
+  document.getElementById('em-venc').value = addDiasISO(gv('em-data') || hojeISO(), dias === null ? 15 : dias);
+}
 function abrirEmitir(tipo, ref) {
   if (!pode('emitir')) { showToast('⛔ O seu perfil não pode emitir facturas, VD ou recibos.'); return; }
   let cot;
@@ -2842,8 +2932,8 @@ function abrirEmitir(tipo, ref) {
     `${cot.origem ? 'Cotação ' + cot.origem : 'Dados do formulário'} · Cliente: ${cot.cliNome || '—'} · Total: ${fmt(cot.total)} ${cot.moeda || 'MT'}`;
   document.getElementById('em-num').value = proximoNumDoc(tipo);
   document.getElementById('em-data').value = hojeISO();
-  const v = new Date(); v.setDate(v.getDate() + 15);
-  document.getElementById('em-venc').value = (cot.venc && cot.venc >= hojeISO()) ? cot.venc : dataLocalISO(v);
+  _vencManual = false;
+  recalcVencEmitir();
   document.getElementById('em-obs').value = cot.obs || '';
   document.getElementById('em-venc-wrap').style.display = tipo === 'FT' ? '' : 'none';
   document.getElementById('em-metodo-wrap').style.display = tipo === 'VD' ? '' : 'none';
@@ -3100,16 +3190,11 @@ function renderResumos() {
   const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]')
     .filter(c => (c.moeda || 'MT') === moeda && (!de || c.data >= de) && (!ate || c.data <= ate));
 
-  // IVA por taxa (respeita o desconto proporcional de cada documento)
+  // IVA por taxa (mesma regra de cálculo dos documentos)
   const taxas = {};
   fact.forEach(d => {
-    const sb = (d.items || []).reduce((a, it) => a + calcLiq(it), 0);
-    const fator = sb > 0 ? (sb - (+d.desconto || 0)) / sb : 1;
-    (d.items || []).forEach(it => {
-      const b = calcLiq(it) * fator, r = +it.iva || 0;
-      const t = taxas[r] = taxas[r] || { base: 0, iva: 0 };
-      t.base += b; t.iva += b * r / 100;
-    });
+    const T = calcTotaisDoc(d.items, d.descTipo, d.descValor);
+    Object.keys(T.porTaxa).forEach(r => { const t = taxas[r] = taxas[r] || { base: 0, iva: 0 }; t.base += T.porTaxa[r].base; t.iva += T.porTaxa[r].iva; });
   });
 
   // Por cliente
@@ -3210,8 +3295,8 @@ function renderUsuarios() {
         <td><span class="tag tag-${u.role === 'cotacionario' ? 'RC' : (u.role === 'usuario' ? 'FT' : 'VD')}">${esc((ROLES_INFO[u.role] || {}).nome || u.role)}</span></td>
         <td>${u.ativo === 'nao' ? '<span class="tag st-Anulado">Desactivado</span>' : '<span class="tag st-Pago">Activo</span>'}</td>
         <td>${u.ultimoLogin ? esc(String(u.ultimoLogin).slice(0, 16).replace('T', ' ')) : '—'}</td>
-        <td class="r">${gerivel ? `<button class="btn btn-primary btn-sm" onclick="abrirUsuarioModal('${esc(u.id)}')">✏️</button>
-          ${eu ? '' : `<button class="btn btn-danger btn-sm" onclick="apagarUsuario('${esc(u.id)}')">🗑️</button>`}` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
+        <td class="r">${gerivel ? `<button class="btn btn-primary btn-sm" onclick="abrirUsuarioModal(${jsq(u.id)})">✏️</button>
+          ${eu ? '' : `<button class="btn btn-danger btn-sm" onclick="apagarUsuario(${jsq(u.id)})">🗑️</button>`}` : '<span style="color:var(--muted);font-size:11px">—</span>'}</td>
       </tr>`;
     }).join('') + '</tbody></table>';
 }
