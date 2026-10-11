@@ -1318,12 +1318,12 @@ async function ligarBaseDados() {
     await sincronizarTudo();
   } else showToast('❌ Falha ao ligar.');
 }
-async function sincronizarTudo(silencioso) {
+async function sincronizarTudo(silencioso, only) {
   if (!temDB() || !SESSAO || _escritasEmCurso) return;
   const filaOk = await esvaziarFila();
   if (!filaOk && getFila().length) { setDbStatus(false, `${getFila().length} por enviar`); return; }
   enviarLogs();
-  const r = await dbCallRaw('getAll', {});
+  const r = await dbCallRaw('getAll', only ? { only } : {});
   if (!r || !r.ok) { setDbStatus(false, 'Falha ao sincronizar.'); return; }
   if (getFila().length) return;
   if (r.config) {
@@ -1349,11 +1349,11 @@ async function sincronizarTudo(silencioso) {
   if (Array.isArray(r.documentos)) setDocs(r.documentos.map(normDoc).filter(d => d.id).sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || ''))));
   if (Array.isArray(r.movstock)) setMovs(r.movstock.slice().sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || ''))).slice(0, 5000));
   /* Numeração: o servidor atribui FT/VD/RC; localmente só se acompanha o valor do servidor */
-  ['FT','VD','RC'].forEach(t => { const k = TIPOS_DOC[t].seq; localStorage.setItem(k, Math.max(parseInt((r.config && r.config[k]) || 0) || 0, seqMaximoDoc(t))); });
-  localStorage.setItem('cotSeq', Math.max(parseInt((r.config && r.config.cotSeq) || 0) || 0, seqMaximo()));
+  if (r.config) ['FT','VD','RC'].forEach(t => { const k = TIPOS_DOC[t].seq; localStorage.setItem(k, Math.max(parseInt((r.config && r.config[k]) || 0) || 0, seqMaximoDoc(t))); });
+  if (r.config) localStorage.setItem('cotSeq', Math.max(parseInt((r.config && r.config.cotSeq) || 0) || 0, seqMaximo()));
   if (_numAuto && gv('cot-num') === _numAuto) autoNum();
   const nR = k => Array.isArray(r[k]) ? r[k].length : 0;
-  setDbStatus(true, `Ligado. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
+  if (!only) setDbStatus(true, `Ligado. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
     ` · app ${VERSAO_APP}` + (r.versao ? ` · script ${r.versao}` : '') + '.');
   if (!silencioso) showToast('🔄 Sincronização concluída!');
   const ativo = painelActivo();
@@ -1362,6 +1362,7 @@ async function sincronizarTudo(silencioso) {
   if (ativo === 'documentos') renderDocList();
   if (ativo === 'resumos') renderResumos();
   if (ativo === 'clientes') renderClientes();
+  return r.revs || true;
 }
 function normProd(p) {
   return { ...p, ref: String(p.ref == null ? '' : p.ref), desc: String(p.desc == null ? '' : p.desc), un: p.un || 'Un', id: normId(p.id),
@@ -1419,17 +1420,20 @@ async function ligarComRetry(tentativa) {
   if (tentativa < 5) setTimeout(() => ligarComRetry(tentativa + 1), tentativa * 2000);
   else setDbStatus(false, 'Não foi possível ligar. A trabalhar localmente.');
 }
-let _rev = null;
+let _revs = null, _ultPoll = 0;
 function iniciarLigacaoPersistente() {
-  /* A cada 8 s: batimento (sessão única) + deteta alterações de outros utilizadores */
+  /* A cada 3 s: batimento (sessão única) + deteta o que outros utilizadores alteraram e vai buscar só essas listas */
   setInterval(async () => {
     if (!temDB() || !SESSAO || !SESSAO.token || _syncEmCurso) return;
+    if (document.hidden && Date.now() - _ultPoll < 20000) return;
+    _ultPoll = Date.now();
     const r = await dbCallRaw('rev', {});
-    if (r && r.ok && r.rev !== _rev) {
-      _syncEmCurso = true;
-      try { await sincronizarTudo(true); _rev = r.rev; } finally { _syncEmCurso = false; }
-    }
-  }, 8000);
+    if (!r || !r.ok || !r.revs) return;
+    const mudou = _revs ? Object.keys(r.revs).filter(k => r.revs[k] !== _revs[k]) : null;
+    if (_revs && !mudou.length) return;
+    _syncEmCurso = true;
+    try { if (await sincronizarTudo(true, mudou || undefined)) _revs = r.revs; } finally { _syncEmCurso = false; }
+  }, 3000);
   setInterval(() => {
     if (temDB() && !_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); }
   }, 120000);
@@ -2600,7 +2604,6 @@ async function emitirDoc(tipo, doc) {
     if (Array.isArray(r.produtos)) setProdutos(r.produtos.map(normProd));
     const k = TIPOS_DOC[tipo].seq;
     if (seqDeNum(d.num) > (parseInt(localStorage.getItem(k) || 0) || 0)) localStorage.setItem(k, seqDeNum(d.num));
-    _rev = null;
     return d;
   }
   const movs = tipo === 'RC' ? [] : movsStock(doc, -1, 'VENDA', `${doc.tipo} ${doc.num}`);
