@@ -932,7 +932,9 @@ async function confirmarLogin() {
       SESSAO = { username: r.user.username, nome: r.user.nome, role: r.user.role, token: r.token };
       guardarVerificadorOffline(r.user.username, pass, r.user);
       localStorage.setItem('authAtivo', '1');
-      entrarNoSistema(); return;
+      entrarNoSistema();
+      if (r.user.trocarSenha) pedirTrocaSenha();
+      return;
     }
     if (r && r.code === 'NOUSERS') {
       if (user === LOGIN_USER && pass === LOGIN_PASS) {
@@ -1082,6 +1084,7 @@ async function dbCallRaw(action, payload) {
     if (json && json.ok === false) {
       if (json.code === 'AUTH') sessaoExpirada(json.error);
       else if (json.code === 'PERM') showToast('⛔ ' + json.error);
+      else if (json.code === 'TROCAR_SENHA') pedirTrocaSenha();
     }
     return json;
   } catch (err) {
@@ -3253,6 +3256,12 @@ async function apagarUsuario(id) {
   showToast('Utilizador apagado.');
   carregarUsuarios();
 }
+function pedirTrocaSenha() {
+  if (!SESSAO || !SESSAO.token || document.getElementById('modal-conta').classList.contains('open')) return;
+  abrirMinhaConta();
+  const e = document.getElementById('conta-erro');
+  e.textContent = 'A sua palavra-passe foi redefinida. Defina uma nova para continuar.'; e.style.display = 'block';
+}
 function abrirMinhaConta() {
   if (!SESSAO) return;
   document.getElementById('conta-info').innerHTML = `<strong>${esc(SESSAO.nome || SESSAO.username)}</strong> (${esc(SESSAO.username)}) · Perfil: <strong>${esc((ROLES_INFO[SESSAO.role] || {}).nome || SESSAO.role)}</strong>`;
@@ -3276,9 +3285,11 @@ async function alterarMinhaSenha() {
   if (n1 !== n2) return falha('Não coincidem.');
   const r = await dbCall('changePassword', { atual, nova: n1 });
   if (!r || !r.ok) return falha((r && r.error) || 'Erro.');
+  if (r.token) SESSAO.token = r.token;   /* o servidor emite novo token ao mudar a palavra-passe */
   guardarVerificadorOffline(SESSAO.username, n1, SESSAO);
   fecharModal();
   showToast('Alterada.');
+  sincronizarTudo(true);
 }
 
 /* ════════ LOG ════════ */
