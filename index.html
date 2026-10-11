@@ -178,10 +178,11 @@ body.locked{overflow:hidden}
 .cli-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:14px}
 .cli-actions{display:flex;flex-direction:column;gap:4px}
 .icon-inline{display:inline-flex;align-items:center;gap:6px}
-#conn-status{position:fixed;bottom:12px;left:12px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;box-shadow:var(--shadow);z-index:500;display:flex;align-items:center;gap:6px;opacity:.85}
+#conn-status{position:fixed;bottom:12px;left:12px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;box-shadow:var(--shadow);z-index:500;display:flex;align-items:center;gap:6px;opacity:.9}
 #conn-status .dot{width:8px;height:8px;border-radius:50%;background:#ccc}
 #conn-status.ok .dot{background:#0d6e3f}
 #conn-status.err .dot{background:#c0392b}
+#conn-status.warn .dot{background:#b45309}
 </style>
 </head>
 <body class="locked">
@@ -206,7 +207,7 @@ body.locked{overflow:hidden}
   </div>
 </div>
 
-<div id="conn-status" title="Estado da ligação"><span class="dot"></span><span id="conn-txt">...</span></div>
+<div id="conn-status"><span class="dot"></span><span id="conn-txt">...</span></div>
 
 <div class="tabs no-print">
   <div class="tab active" data-tab="cotacao" hidden onclick="irParaNovoDocumento()" data-icon="novo"><span>Novo Documento</span></div>
@@ -443,7 +444,7 @@ body.locked{overflow:hidden}
       <strong>Admin</strong> — cotações, facturação, resumos, produtos, anular documentos.<br>
       <strong>Usuário</strong> — cotações, facturas/VD/recibos e produtos.<br>
       <strong>Cotacionário</strong> — só as suas cotações.<br><br>
-      <strong>Política:</strong> mínimo 10 caracteres, com maiúscula, minúscula, número e símbolo. Não pode reutilizar as últimas 3 palavras-passe.
+      <strong>Política:</strong> mínimo 10 caracteres, com maiúscula, minúscula, número e símbolo.
     </div>
     <div class="btn-bar" style="margin-bottom:10px">
       <button class="btn btn-primary btn-sm" onclick="abrirUsuarioModal()">Novo utilizador</button>
@@ -476,19 +477,6 @@ body.locked{overflow:hidden}
     <div id="log-info" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
     <div id="log-integridade" style="display:none;font-size:12px;margin-bottom:8px"></div>
     <div id="log-list" class="res-wrap"></div>
-    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
-      <div style="font-weight:700;font-size:13px;margin-bottom:6px">Arquivo de registos antigos</div>
-      <div class="doc-filtros">
-        <div class="field"><label>Arquivar anteriores a</label><input type="date" id="arq-data"></div>
-        <div class="field"><label>&nbsp;</label><div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-secondary btn-sm" onclick="simularArquivo()">Simular</button>
-          <button class="btn btn-primary btn-sm" onclick="arquivarLogsAgora()">Arquivar agora</button>
-          <button class="btn btn-secondary btn-sm" onclick="carregarArquivos()">Lista</button>
-        </div></div>
-      </div>
-      <div id="arq-estado" style="font-size:12px;margin-bottom:8px"></div>
-      <div id="arq-lista" class="res-wrap"></div>
-    </div>
   </div>
 
   <div class="card" data-perm="db">
@@ -688,9 +676,6 @@ body.locked{overflow:hidden}
     <div class="field"><label>Estado</label><select id="usr-ativo"><option value="sim">Activo</option><option value="nao">Desactivado</option></select></div>
     <div class="field s2"><label id="usr-pass-label">Palavra-passe</label>
       <div class="pass-wrap"><input type="password" id="usr-pass" autocomplete="new-password"><button type="button" class="eye" onclick="togglePass('usr-pass', this)" data-eye></button></div>
-      <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5">
-        <strong>Política:</strong> mínimo 10 caracteres, com maiúscula, minúscula, número e símbolo.
-      </div>
     </div>
   </div>
   <div class="alert alert-info" id="usr-role-desc" style="font-size:12px;margin-top:10px"></div>
@@ -740,14 +725,13 @@ body.locked{overflow:hidden}
 <script>
 'use strict';
 
-const VERSAO_APP = '2026-10-11-v13';
+const VERSAO_APP = '2026-10-11-v14';
 const _DBC = [104,116,116,112,115,58,47,47,115,99,114,105,112,116,46,103,111,111,103,108,101,46,99,111,109,47,109,97,99,114,111,115,47,115,47,65,75,102,121,99,98,121,89,65,49,118,97,84,90,51,56,77,88,66,107,111,69,121,122,118,80,49,87,87,70,48,75,89,116,83,112,66,97,81,79,105,121,116,104,45,115,71,105,71,52,102,111,49,66,105,102,45,70,71,57,65,65,95,99,81,106,111,112,55,121,65,121,47,101,120,101,99];
 function _dbDef() { return String.fromCharCode.apply(null, _DBC); }
 const _XK = 0x5A;
 function _xEnc(s) { let r = ''; for (let i = 0; i < s.length; i++) r += String.fromCharCode(s.charCodeAt(i) ^ _XK); return btoa(r); }
 function _xDec(s) { try { let d = atob(s), r = ''; for (let i = 0; i < d.length; i++) r += String.fromCharCode(d.charCodeAt(i) ^ _XK); return r; } catch (e) { return ''; } }
 
-/* ───────────── ÍCONES SVG ───────────── */
 const ICONS = {
   novo:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>',
   guardadas:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
@@ -794,7 +778,7 @@ const ICONS = {
 
 let SESSAO = null;
 let _inactivityTimer = null;
-const INACTIVITY_MS = 10 * 60 * 1000; /* 10 minutos */
+const INACTIVITY_MS = 30 * 60 * 1000;
 
 const ROLES_INFO = {
   master:       { nome: 'Master',       desc: 'Acesso total. Único com acesso às Configurações.' },
@@ -813,7 +797,6 @@ function pode(p)    { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P[p
 function podeVer(t) { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P.tabs.includes(t)); }
 function painelActivo() { const el = document.querySelector('.panel.active'); return el ? el.id.replace('tab-', '') : 'cotacao'; }
 
-/* ───────────── INJECTAR ÍCONES ───────────── */
 function aplicarIconesTabs() {
   document.querySelectorAll('.tab[data-icon]').forEach(t => {
     const ico = ICONS[t.dataset.icon];
@@ -840,14 +823,13 @@ function togglePass(id, btn) {
   else { el.type = 'password'; btn.innerHTML = ICONS.eye; }
 }
 
-/* ───────────── SESSÃO / INATIVIDADE ───────────── */
 function reiniciarTimerInatividade() {
   if (!SESSAO) return;
   clearTimeout(_inactivityTimer);
   _inactivityTimer = setTimeout(() => {
     if (SESSAO) {
       try { registarLog('AUTH_INATIVIDADE', 'Sessão', SESSAO.username, 'Sessão encerrada por inatividade'); } catch(e){}
-      alert('A sessão foi encerrada automaticamente após 10 minutos de inatividade.');
+      alert('A sessão foi encerrada automaticamente após 30 minutos de inatividade.');
       terminarSessaoSilencioso();
     }
   }, INACTIVITY_MS);
@@ -857,7 +839,6 @@ function pararTimerInatividade() { clearTimeout(_inactivityTimer); _inactivityTi
   document.addEventListener(ev, reiniciarTimerInatividade, true);
 });
 
-/* ───────────── SHA-256 LOCAL (para logs) ───────────── */
 function sha256(str) {
   const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
   const bytes = unescape(encodeURIComponent(str)).split('').map(c => c.charCodeAt(0));
@@ -898,9 +879,12 @@ function entrarNoSistema() {
   document.getElementById('login-screen').classList.add('hidden');
   document.body.classList.remove('locked');
   document.getElementById('login-erro').style.display = 'none';
+  window._sessaoJaExpirou = false;
   aplicarPermissoes();
   reiniciarTimerInatividade();
   setConnStatus('ok', 'Ligado');
+  // NÃO sincroniza imediatamente — deixa o polling estabilizar
+  setTimeout(() => { if (SESSAO) sincronizarTudo(); }, 2000);
   setTimeout(() => {
     if (painelActivo() === 'clientes') renderClientes();
   }, 100);
@@ -913,13 +897,12 @@ async function confirmarLogin() {
   if (!user || !pass) { mostrarErroLogin('Indique o utilizador e a palavra-passe.'); return; }
   btn.disabled = true; btn.textContent = 'A entrar...';
   try {
-    const r = await dbCall('login', { username: user, password: pass });
+    const r = await dbCallRaw('login', { username: user, password: pass });
     if (!r) { mostrarErroLogin('Sem ligação ao servidor. Verifique a internet.'); return; }
     if (r.ok) {
       SESSAO = { username: r.user.username, nome: r.user.nome, role: r.user.role, token: r.token };
       _ultimoPoll = new Date(0).toISOString();
       entrarNoSistema();
-      sincronizarTudo();
       return;
     }
     if (r.code === 'NOUSERS') {
@@ -944,6 +927,7 @@ function mostrarLogin(msg) {
   document.getElementById('login-pass').value = '';
   const erro = document.getElementById('login-erro');
   if (msg) { erro.textContent = msg; erro.style.display = 'block'; } else erro.style.display = 'none';
+  setConnStatus('', 'Aguarda login');
   setTimeout(() => document.getElementById('login-user').focus(), 50);
 }
 
@@ -962,9 +946,12 @@ function terminarSessao() {
 }
 function sessaoExpirada(msg) {
   if (!SESSAO) return;
+  if (window._sessaoJaExpirou) return;
+  window._sessaoJaExpirou = true;
   try { registarLog('AUTH_EXPIRADA', 'Sessão', SESSAO.username, 'Sessão expirada'); } catch(e){}
   fecharModal();
   mostrarLogin(msg || 'Sessão expirada. Inicie sessão novamente.');
+  setTimeout(() => { window._sessaoJaExpirou = false; }, 5000);
 }
 
 function abrirSetupMaster() {
@@ -985,20 +972,18 @@ async function confirmarSetupMaster() {
   if (!/[^a-zA-Z0-9]/.test(p1)) return falha('Inclua um símbolo.');
   if (p1 !== p2) return falha('As palavras-passe não coincidem.');
   const btn = document.getElementById('setup-btn'); btn.disabled = true;
-  const r = await dbCall('setupMaster', { username, nome, password: p1 });
+  const r = await dbCallRaw('setupMaster', { username, nome, password: p1 });
   btn.disabled = false;
   if (!r || !r.ok) return falha((r && r.error) || 'Sem ligação. Tente novamente.');
   SESSAO = { username: r.user.username, nome: r.user.nome, role: r.user.role, token: r.token };
   _ultimoPoll = new Date(0).toISOString();
-  fecharModal(); entrarNoSistema(); sincronizarTudo();
+  fecharModal(); entrarNoSistema();
   showToast('Master criado.');
 }
 
-/* ───────────── ESTADO GLOBAL ───────────── */
 let items = [];
 let itemIdx = 0;
-const LOGO_PADRAO = '';
-let logoData = LOGO_PADRAO;
+let logoData = '';
 let _itemParaSel = null;
 let _syncEmCurso = false;
 let _ultimoPoll = new Date(0).toISOString();
@@ -1007,7 +992,6 @@ let _pollEmCurso = false;
 let _online = true;
 let _nArquivos = 0;
 
-/* ───────────── BASE DE DADOS ───────────── */
 function getDbUrl() {
   const enc = localStorage.getItem('cfg-db-url');
   if (enc) {
@@ -1045,7 +1029,8 @@ function setConnStatus(estado, txt) {
   const el = document.getElementById('conn-status');
   if (!el) return;
   el.className = estado;
-  document.getElementById('conn-txt').textContent = txt;
+  const t = document.getElementById('conn-txt');
+  if (t) t.textContent = txt || '';
   if (estado === 'ok') _online = true;
   if (estado === 'err') _online = false;
 }
@@ -1063,8 +1048,16 @@ async function dbCallRaw(action, payload) {
     const json = await res.json();
     setConnStatus('ok', 'Ligado');
     if (json && json.ok === false) {
-      if (json.code === 'AUTH') sessaoExpirada(json.error);
-      else if (json.code === 'PERM') showToast('⛔ ' + json.error);
+      if (json.code === 'AUTH') {
+        // NÃO expulsar em poll/ping/status — só em acções reais
+        if (action !== 'poll' && action !== 'ping' && action !== 'status') {
+          sessaoExpirada(json.error);
+        } else {
+          setConnStatus('warn', 'Sessão expirada');
+        }
+      } else if (json.code === 'PERM') {
+        showToast('⛔ ' + json.error);
+      }
     }
     return json;
   } catch (err) {
@@ -1074,11 +1067,10 @@ async function dbCallRaw(action, payload) {
 }
 async function dbCall(action, payload) { return dbCallRaw(action, payload); }
 
-/* ───────────── POLLING EM TEMPO REAL ───────────── */
 function iniciarPolling() {
-  const intervalo = () => document.visibilityState === 'visible' ? 3000 : 10000;
+  const intervalo = () => document.visibilityState === 'visible' ? 4000 : 12000;
   const ciclo = async () => {
-    if (!SESSAO || !temDB() || !_online || _pollEmCurso) {
+    if (!SESSAO || !temDB() || _pollEmCurso) {
       _pollTimer = setTimeout(ciclo, intervalo());
       return;
     }
@@ -1095,18 +1087,18 @@ function iniciarPolling() {
     }
   };
   if (_pollTimer) clearTimeout(_pollTimer);
-  _pollTimer = setTimeout(ciclo, 1500);
+  _pollTimer = setTimeout(ciclo, 4000);
 
   window.addEventListener('online', () => {
     setConnStatus('ok', 'Ligado');
-    if (temDB()) { showToast('Ligação restabelecida.'); _ultimoPoll = new Date(0).toISOString(); ligarComRetry(); }
+    if (temDB() && SESSAO) { showToast('Ligação restabelecida.'); _ultimoPoll = new Date(0).toISOString(); ligarComRetry(); }
   });
   window.addEventListener('offline', () => { setConnStatus('err', 'Sem ligação'); });
 
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && SESSAO) {
       clearTimeout(_pollTimer);
-      _pollTimer = setTimeout(ciclo, 300);
+      _pollTimer = setTimeout(ciclo, 800);
     }
   });
 }
@@ -1163,7 +1155,7 @@ function aplicarMudancasRemotas(r) {
 async function ligarComRetry(tentativa) {
   if (!SESSAO) return;
   tentativa = tentativa || 1;
-  const r = await dbCall('ping', {});
+  const r = await dbCallRaw('ping', {});
   if (r && r.ok) { setConnStatus('ok', 'Ligado'); sincronizarTudo(); return; }
   if (tentativa < 5) setTimeout(() => ligarComRetry(tentativa + 1), tentativa * 2000);
   else setConnStatus('err', 'Sem ligação');
@@ -1175,7 +1167,6 @@ async function sincronizarTudo() {
   try {
     const r = await dbCallRaw('getAll', {});
     if (!r || !r.ok) { setConnStatus('err', 'Falha ao sincronizar'); return; }
-    const localDe = k => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };
     if (Array.isArray(r.clientes)) {
       localStorage.setItem('clientes', JSON.stringify(r.clientes.map(c => ({
         id: normId(c.id), nome: String(c.nome == null ? '' : c.nome), nuit: String(c.nuit == null ? '' : c.nuit),
@@ -1236,7 +1227,6 @@ async function sincronizarTudo() {
 
 function normId(id) { return (typeof id === 'number') ? id : (isNaN(+id) ? id : +id); }
 
-/* Storage cheio */
 (function () {
   const original = Storage.prototype.setItem;
   let avisado = false;
@@ -1249,7 +1239,6 @@ function normId(id) { return (typeof id === 'number') ? id : (isNaN(+id) ? id : 
   };
 })();
 
-/* ───────────── INIT ───────────── */
 document.addEventListener('DOMContentLoaded', () => {
   mostrarLogin();
   carregarConfig();
@@ -1265,13 +1254,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (dbInput) dbInput.value = mascararUrl(getDbUrl());
 
   iniciarPolling();
-  // Fallback: sincronização completa a cada 60s
   setInterval(() => {
     if (temDB() && SESSAO && _online && !_syncEmCurso) sincronizarTudo();
   }, 60000);
 });
 
-/* ───────────── DATAS ───────────── */
 function dataLocalISO(date) {
   const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
@@ -1309,7 +1296,6 @@ function prazoDeCond(txt) {
   return null;
 }
 
-/* ───────────── NUMERAÇÃO ───────────── */
 let _numAuto = '';
 function seqDeNum(num) { const m = String(num || '').match(/(\d+)\//); return m ? parseInt(m[1], 10) : 0; }
 function seqMaximo() {
@@ -1333,7 +1319,6 @@ function autoNum() {
   document.getElementById('cot-num').value = _numAuto;
 }
 
-/* ───────────── TABS ───────────── */
 function switchTab(id) {
   if (SESSAO && !podeVer(id)) { showToast('⛔ Sem acesso.'); return; }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1350,7 +1335,7 @@ function switchTab(id) {
   if (id === 'resumos') iniciarResumos();
   if (id === 'produtos') renderProdList();
   if (id === 'config' && pode('utilizadores')) carregarUsuarios();
-  if (id === 'config' && pode('db')) { carregarLogs(); carregarArquivos(); }
+  if (id === 'config' && pode('db')) carregarLogs();
 }
 
 let _tipoDoc = 'COT';
@@ -1366,9 +1351,9 @@ function escolherTipoDoc(t) {
   const T = { FT: 'Emitir Factura', VD: 'Emitir Venda a Dinheiro', RC: 'Emitir Recibo' };
   document.getElementById('picker-titulo').textContent = T[t] || 'Escolher documento';
   const hints = {
-    FT: 'Escolha a <strong>cotação</strong> de onde nasce a factura. <u>O stock será verificado e deduzido automaticamente</u> ao emitir.',
-    VD: 'Escolha a <strong>cotação</strong> de onde nasce a venda a dinheiro. <u>O stock será verificado e deduzido automaticamente</u> ao emitir.',
-    RC: 'Escolha a <strong>factura</strong> que já recebeu pagamento. Só aparecem facturas com saldo em aberto.'
+    FT: 'Escolha a <strong>cotação</strong> de onde nasce a factura.',
+    VD: 'Escolha a <strong>cotação</strong> de onde nasce a venda a dinheiro.',
+    RC: 'Escolha a <strong>factura</strong> que já recebeu pagamento.'
   };
   document.getElementById('picker-hint').innerHTML = hints[t] || '';
   renderPicker();
@@ -1415,7 +1400,6 @@ function irParaEmitir(tipo, num) { abrirEmitir(tipo, num); }
 function irParaRecibo(idEnc) { abrirRecibo(idEnc); }
 function irParaNovoDocumento() { escolherTipoDoc('COT'); limparFormSilencioso(); switchTab('cotacao'); }
 
-/* ───────────── ITENS ───────────── */
 function addItem() { items.push({id:++itemIdx, ref:'', desc:'', qtd:1, un:'Un', pu:0, iva:16}); renderItems(); }
 function removeItem(id) { items = items.filter(i=>i.id!==id); renderItems(); }
 function renderItems() {
@@ -1498,7 +1482,6 @@ function calcTotaisComDesconto() {
   return { sub: T.sub, desconto: T.desconto, descTipo, descValor, iva: T.iva, total: T.total };
 }
 
-/* ───────────── CONFIGURAÇÕES ───────────── */
 function salvarConfig() {
   ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-prefix-ft','cfg-prefix-vd','cfg-prefix-rc','cfg-rodape','cfg-logo2']
     .forEach(f => localStorage.setItem(f, document.getElementById(f).value));
@@ -1512,7 +1495,7 @@ function salvarConfig() {
     ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-prefix-ft','cfg-prefix-vd','cfg-prefix-rc','cfg-rodape','cfg-cor','cfg-logo2']
       .forEach(f => cfg[f] = gv(f));
     if (logoData) cfg.logoData = logoData;
-    dbCall('saveConfig', { config: cfg }).then(r => { if (r && r.ok) showToast('Configurações sincronizadas.'); });
+    dbCall('saveConfig', { config: cfg });
   }
 }
 function carregarConfig() {
@@ -1540,9 +1523,7 @@ function loadLogo(file) {
       showLogoPreview(svgDataUri);
       try { localStorage.setItem('logoData', svgDataUri); }
       catch (err) { showToast('⚠️ Não persistido.'); return; }
-      if (svgDataUri.length > 48000) { showToast('⚠️ SVG grande demais.'); }
-      else if (temDB()) dbCall('saveConfig', { config: { logoData: svgDataUri } }).then(r => { if (r && r.ok) showToast('Logotipo guardado!'); });
-      else showToast('Logotipo carregado!');
+      if (temDB()) dbCall('saveConfig', { config: { logoData: svgDataUri } });
     };
     r.readAsText(file);
     return;
@@ -1596,9 +1577,8 @@ async function diagnosticoDB() {
   const loc = k => { try { return JSON.parse(localStorage.getItem(k) || '[]').length; } catch (e) { return 0; } };
   box.textContent =
     `Script versão: ${r.versao}\nSheet: ${r.planilha}\n\n` +
-    `Folhas:\n` +
     Object.keys(r.contagens).map(k => `  ${k}: ${r.contagens[k]}`).join('\n') +
-    `\n\nNeste dispositivo: ${loc('cotacoes')} cotações · ${loc('clientes')} clientes · ${loc('produtos')} produtos · ${loc('documentos')} documentos · ${loc('movstock')} movimentos`;
+    `\n\nNeste dispositivo: ${loc('cotacoes')} cotações · ${loc('clientes')} clientes · ${loc('produtos')} produtos · ${loc('documentos')} documentos`;
 }
 async function ligarBaseDados() {
   if (_dbUrlVisivel) {
@@ -1621,7 +1601,6 @@ async function ligarBaseDados() {
   } else showToast('❌ Falha ao ligar.');
 }
 
-/* ───────────── CLIENTES ───────────── */
 function getClientes() { try { return JSON.parse(localStorage.getItem('clientes') || '[]'); } catch (e) { return []; } }
 function setClientes(a) { localStorage.setItem('clientes', JSON.stringify(a)); }
 
@@ -1634,10 +1613,8 @@ function registarClienteAuto(dados) {
   const agora = new Date().toISOString();
   const campos = ['nuit','end','cidade','tel','email'];
   const novos = {
-    nuit: String(dados.cliNuit || '').trim(),
-    end: String(dados.cliEnd || '').trim(),
-    cidade: String(dados.cliCidade || '').trim(),
-    tel: String(dados.cliTel || '').trim(),
+    nuit: String(dados.cliNuit || '').trim(), end: String(dados.cliEnd || '').trim(),
+    cidade: String(dados.cliCidade || '').trim(), tel: String(dados.cliTel || '').trim(),
     email: String(dados.cliEmail || '').trim()
   };
   if (cli) {
@@ -1674,10 +1651,8 @@ function guardarClienteDoForm() {
     nome, nuit: gv('cli-nuit').trim(), end: gv('cli-end').trim(),
     cidade: gv('cli-cidade').trim(), tel: gv('cli-tel').trim(), email: gv('cli-email').trim()
   };
-  if (cli) {
-    Object.assign(cli, dados, { atualizadoEm: agora });
-    registarLog('CLI_ATUALIZAR', 'Cliente', cli.nome, 'Atualizado manualmente');
-  } else {
+  if (cli) { Object.assign(cli, dados, { atualizadoEm: agora }); registarLog('CLI_ATUALIZAR', 'Cliente', cli.nome, 'Atualizado manualmente'); }
+  else {
     cli = Object.assign({ id: Date.now() + Math.floor(Math.random() * 1000), criadoEm: agora, atualizadoEm: agora, criadoAuto: '' }, dados);
     lista.unshift(cli);
     registarLog('CLI_CRIAR', 'Cliente', cli.nome, cli.nuit ? 'NUIT ' + cli.nuit : '');
@@ -1693,7 +1668,7 @@ function renderClientes() {
   if (!wrap) return;
   let lista = getClientes();
   if (!lista.length) {
-    wrap.innerHTML = `<div class="empty-state"><div class="big">${ICONS.clientes}</div><p style="font-size:14px;font-weight:600">Ainda não tem clientes</p><p style="margin-top:6px;font-size:12px">Os clientes são registados automaticamente quando guarda uma cotação ou emite um documento.</p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><div class="big">${ICONS.clientes}</div><p style="font-size:14px;font-weight:600">Ainda não tem clientes</p></div>`;
     if (stats) stats.textContent = '';
     return;
   }
@@ -1703,7 +1678,6 @@ function renderClientes() {
   if (q) filtrados = filtrados.filter(c => ((c.nome||'')+(c.nuit||'')+(c.cidade||'')+(c.email||'')+(c.tel||'')).toLowerCase().includes(q));
   if (fTipo === 'manual') filtrados = filtrados.filter(c => c.criadoAuto !== 'sim');
   if (fTipo === 'auto')   filtrados = filtrados.filter(c => c.criadoAuto === 'sim');
-
   const docs = getDocs();
   const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]');
   const contaCli = nome => {
@@ -1714,13 +1688,12 @@ function renderClientes() {
     docs.forEach(d => { if (String(d.cliNome || '').trim().toLowerCase() === k && d.estado !== 'Anulado') doc++; });
     return { cot, doc };
   };
-
   const auto = lista.filter(c => c.criadoAuto === 'sim').length;
   if (stats) stats.textContent = `${lista.length} cliente(s) no total · ${auto} registado(s) automaticamente · ${lista.length - auto} manual(is)`;
   filtrados.sort((a,b) => String(a.nome||'').localeCompare(String(b.nome||''), 'pt'));
   wrap.innerHTML = '<div class="cli-list">' + filtrados.map(c => {
     const cnt = contaCli(c.nome);
-    const tag = c.criadoAuto === 'sim' ? '<span class="cli-badge auto" title="Registado automaticamente">auto</span>' : '<span class="cli-badge" title="Adicionado manualmente">manual</span>';
+    const tag = c.criadoAuto === 'sim' ? '<span class="cli-badge auto">auto</span>' : '<span class="cli-badge">manual</span>';
     const info = [c.nuit ? 'NUIT: ' + c.nuit : '', c.cidade, c.tel ? 'Tel: ' + c.tel : '', c.email ? c.email : ''].filter(Boolean).join(' · ');
     return `<div class="cli-card">
       <div style="flex:1;min-width:0">
@@ -1731,10 +1704,10 @@ function renderClientes() {
         </div>
       </div>
       <div class="cli-actions">
-        <button class="btn btn-primary btn-sm" title="Editar" onclick="abrirClienteModal(${jsqId(c.id)})">${ICONS.edit}</button>
-        <button class="btn btn-success btn-sm" title="Usar em nova cotação" onclick="usarClienteEmNova(${jsqId(c.id)})">${ICONS.cot}</button>
-        <button class="btn btn-secondary btn-sm" title="Ver documentos" onclick="verDocsDoCliente(${jsq(c.nome)})">${ICONS.documentos}</button>
-        <button class="btn btn-danger btn-sm" title="Apagar" onclick="apagarClienteById(${jsqId(c.id)})">${ICONS.x}</button>
+        <button class="btn btn-primary btn-sm" onclick="abrirClienteModal(${jsqId(c.id)})">${ICONS.edit}</button>
+        <button class="btn btn-success btn-sm" onclick="usarClienteEmNova(${jsqId(c.id)})">${ICONS.cot}</button>
+        <button class="btn btn-secondary btn-sm" onclick="verDocsDoCliente(${jsq(c.nome)})">${ICONS.documentos}</button>
+        <button class="btn btn-danger btn-sm" onclick="apagarClienteById(${jsqId(c.id)})">${ICONS.x}</button>
       </div>
     </div>`;
   }).join('') + '</div>';
@@ -1772,7 +1745,6 @@ function salvarClienteEdit() {
   const key = nome.toLowerCase();
   const duplicado = lista.find(c => c.id !== +id && String(c.nome||'').trim().toLowerCase() === key);
   if (duplicado && !confirm(`Já existe um cliente com o nome "${duplicado.nome}". Guardar mesmo assim?`)) return;
-
   let cli;
   if (id) {
     cli = lista.find(x => x.id === +id);
@@ -1795,10 +1767,10 @@ function apagarClienteById(id) {
   const lista = getClientes();
   const c = lista.find(x => x.id === id);
   if (!c) return;
-  if (!confirm(`Apagar o cliente "${c.nome}"?\n\nAs cotações e documentos que já emitiu mantêm-se.`)) return;
+  if (!confirm(`Apagar o cliente "${c.nome}"?`)) return;
   const nova = lista.filter(x => x.id !== id);
   setClientes(nova);
-  registarLog('CLI_APAGAR', 'Cliente', c.nome, c.criadoAuto === 'sim' ? 'auto' : 'manual');
+  registarLog('CLI_APAGAR', 'Cliente', c.nome, '');
   if (temDB()) dbCall('deleteCliente', { id: c.id });
   renderClientes();
   showToast('Cliente apagado.');
@@ -1827,11 +1799,8 @@ function verDocsDoCliente(nome) {
   let txt = `Documentos de "${nome}"\n\n`;
   txt += `Cotações (${cots.length}):\n`;
   cots.slice(0, 10).forEach(c => { txt += `  • ${c.num} — ${fmtDate(c.data)} — ${fmt(c.total)} ${c.moeda || 'MT'}\n`; });
-  if (cots.length > 10) txt += `  ... e mais ${cots.length - 10}\n`;
   txt += `\nDocumentos emitidos (${docs.length}):\n`;
-  docs.slice(0, 10).forEach(d => { txt += `  • [${d.tipo}] ${d.num} — ${fmtDate(d.data)} — ${fmt(d.total)} ${d.moeda}${d.estado === 'Anulado' ? ' (ANULADO)' : ''}\n`; });
-  if (docs.length > 10) txt += `  ... e mais ${docs.length - 10}\n`;
-  if (!cots.length && !docs.length) txt += '(Nenhum documento emitido para este cliente.)';
+  docs.slice(0, 10).forEach(d => { txt += `  • [${d.tipo}] ${d.num} — ${fmtDate(d.data)} — ${fmt(d.total)} ${d.moeda}\n`; });
   alert(txt);
 }
 
@@ -1845,13 +1814,10 @@ function renderModalClientes() {
   let lista = getClientes();
   if (q) lista = lista.filter(c => ((c.nome||'')+(c.nuit||'')+(c.tel||'')+(c.cidade||'')).toLowerCase().includes(q));
   const wrap = document.getElementById('modal-cli-list');
-  if (!lista.length) {
-    wrap.innerHTML = '<p style="text-align:center;color:var(--muted);padding:16px">Nenhum cliente encontrado.</p>';
-    return;
-  }
+  if (!lista.length) { wrap.innerHTML = '<p style="text-align:center;color:var(--muted);padding:16px">Nenhum cliente encontrado.</p>'; return; }
   wrap.innerHTML = '<div class="modal-item-grid">' + lista.map(c => `
     <div class="modal-item-card">
-      <div class="modal-item-name">${esc(c.nome)} ${c.criadoAuto === 'sim' ? '<span class="cli-badge auto" style="font-size:9px;padding:0 5px">auto</span>' : ''}</div>
+      <div class="modal-item-name">${esc(c.nome)}</div>
       <div class="modal-item-detail">${esc([c.nuit?'NUIT: '+c.nuit:'', c.tel, c.cidade].filter(Boolean).join(' · ')) || '—'}</div>
       <div class="modal-item-actions">
         <button class="btn btn-primary btn-sm" onclick="selecionarCliente(${jsqId(c.id)})">Seleccionar</button>
@@ -1868,7 +1834,6 @@ function selecionarCliente(id) {
   fecharModal();
 }
 
-/* ───────────── PRODUTOS ───────────── */
 function getProdutos() { return JSON.parse(localStorage.getItem('produtos')||'[]'); }
 function setProdutos(p) { localStorage.setItem('produtos', JSON.stringify(p)); }
 function getMovs() { try { return JSON.parse(localStorage.getItem('movstock') || '[]'); } catch (e) { return []; } }
@@ -1942,6 +1907,7 @@ async function confirmarMovStock() {
   fecharModal();
   showToast(`Stock: ${fmt(antes)} → ${fmt(depois)}`);
   renderProdList();
+  setTimeout(sincronizarTudo, 500);
 }
 function abrirMovHist(prodId) { document.getElementById('hist-q').value = ''; document.getElementById('modal-histstock').classList.add('open'); renderHistStock(prodId); }
 function renderHistStock(prodIdFiltro) {
@@ -2124,7 +2090,6 @@ function selecionarProduto(prodId) {
   renderItems();
 }
 
-/* ───────────── VALIDAÇÃO DE STOCK ───────────── */
 function verificarStockItens(itensArr) {
   const prods = getProdutos();
   const erros = [];
@@ -2142,12 +2107,10 @@ function htmlAlertaStock(erros) {
   if (!erros.length) return '';
   return `<div class="alert alert-danger" style="margin-top:10px">
     <strong>${ICONS.alert} Stock insuficiente:</strong>
-    ${erros.map(e => `<div style="margin-top:5px">• <strong>${esc(e.ref)}</strong> ${esc(e.desc)} — precisa <strong>${fmt(e.precisa)} ${esc(e.un)}</strong>, tem <strong>${fmt(e.tem)}</strong> (faltam ${fmt(e.falta)})</div>`).join('')}
-    <div style="margin-top:8px;font-size:11.5px;color:#666">Reponha o stock em <strong>Produtos → Movimento</strong>.</div>
+    ${erros.map(e => `<div style="margin-top:5px">• <strong>${esc(e.ref)}</strong> ${esc(e.desc)} — precisa <strong>${fmt(e.precisa)} ${esc(e.un)}</strong>, tem <strong>${fmt(e.tem)}</strong></div>`).join('')}
   </div>`;
 }
 
-/* ───────────── GUARDAR COTAÇÃO ───────────── */
 function validarCotacao() {
   const erros = [], avisos = [];
   const comDesc = items.filter(it => String(it.desc || '').trim());
@@ -2202,8 +2165,6 @@ function confirmarGuardar() {
   cot.savedAt = cot.criadoEm;
   cot.modificadoEm = agoraISO;
   cot.impressoes = ((anterior && anterior.impressoes) || 0) + (anterior ? 0 : _impressoesForm);
-  cot.ultimaImpressao = (anterior && anterior.ultimaImpressao) || '';
-  _impressoesForm = 0;
   cot.criadoPor = (anterior && anterior.criadoPor) || (SESSAO && SESSAO.username) || '';
   cot.modificadoPor = (SESSAO && SESSAO.username) || '';
   if (idx>=0) cots[idx]=cot; else cots.unshift(cot);
@@ -2216,7 +2177,7 @@ function confirmarGuardar() {
   showToast('Cotação '+num+' guardada!');
   if (temDB()) {
     dbCall('saveCotacao', { cotacao: cot }).then(r => {
-      if (r && r.ok) setTimeout(sincronizarTudo, 300);
+      if (r && r.ok) setTimeout(sincronizarTudo, 500);
     });
   }
 }
@@ -2267,7 +2228,7 @@ function apagarCotacao(num) {
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]').filter(c=>c.num!==num);
   localStorage.setItem('cotacoes', JSON.stringify(cots));
   renderCotList();
-  if (temDB()) dbCall('deleteCotacao', { num }).then(() => setTimeout(sincronizarTudo, 300));
+  if (temDB()) dbCall('deleteCotacao', { num }).then(() => setTimeout(sincronizarTudo, 500));
   if (gv('cot-num').trim() === num) { limparFormSilencioso(); limparPreview(); }
 }
 async function apagarTodasCotacoes() {
@@ -2275,16 +2236,12 @@ async function apagarTodasCotacoes() {
   const cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
   if (!cots.length) { showToast('Sem cotações.'); return; }
   if (!confirm(`Apagar TODAS as ${cots.length} cotações?`)) return;
-  if (!confirm('Tem mesmo a certeza?')) return;
   registarLog('COT_APAGAR_TODAS', 'Cotação', '*', `${cots.length} apagadas`);
   localStorage.setItem('cotacoes', '[]');
   renderCotList();
   limparFormSilencioso();
   limparPreview();
-  if (temDB()) {
-    for (const c of cots) await dbCall('deleteCotacao', { num: c.num });
-    setTimeout(sincronizarTudo, 300);
-  }
+  if (temDB()) { for (const c of cots) await dbCall('deleteCotacao', { num: c.num }); setTimeout(sincronizarTudo, 500); }
   showToast('Todas apagadas.');
 }
 function limparPreview() {
@@ -2292,7 +2249,6 @@ function limparPreview() {
   if (wrap) wrap.innerHTML = `<div class="empty-state"><div class="big">${ICONS.eye}</div><p style="font-size:14px;font-weight:600">Nada para mostrar</p></div>`;
 }
 
-/* ───────────── DOCUMENTOS ───────────── */
 const TIPOS_DOC = {
   COT: { nome: 'Cotação',          titulo: 'COTAÇÃO' },
   FT:  { nome: 'Factura',          titulo: 'FACTURA',          pref: 'FT ', seq: 'ftSeq', cfg: 'cfg-prefix-ft' },
@@ -2384,7 +2340,7 @@ function badgeFacturada(num) {
   const ds = getDocs().filter(d => d.origem === num && (d.tipo === 'FT' || d.tipo === 'VD') && d.estado !== 'Anulado');
   if (!ds.length) return '';
   const d0 = ds.find(d => d.tipo === 'FT') || ds[0];
-  return `<span class="tag tag-${d0.tipo}" title="${esc(ds.map(d => d.num).join(', '))}">${d0.tipo === 'FT' ? 'Facturada' : 'VD'} · ${esc(d0.num)}</span>`;
+  return `<span class="tag tag-${d0.tipo}">${d0.tipo === 'FT' ? 'Facturada' : 'VD'} · ${esc(d0.num)}</span>`;
 }
 let _emitir = null, _vencManual = false;
 function recalcVencEmitir() {
@@ -2410,13 +2366,9 @@ function abrirEmitir(tipo, ref) {
   const errosStock = verificarStockItens(cot.items);
   if (errosStock.length) {
     alert('Stock insuficiente:\n\n' + errosStock.map(e =>
-      `• ${e.ref} ${e.desc}\n   Precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)} (faltam ${fmt(e.falta)})`
-    ).join('\n\n') + '\n\nVá a Produtos → Movimento para repor.');
+      `• ${e.ref} ${e.desc}\n   Precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)}`
+    ).join('\n\n'));
     return;
-  }
-  if (cot.origem) {
-    const ja = getDocs().filter(d => d.origem === cot.origem && (d.tipo === 'FT' || d.tipo === 'VD') && d.estado !== 'Anulado');
-    if (ja.length && !confirm(`Esta cotação já tem ${ja[0].tipo === 'FT' ? 'a factura' : 'a VD'} ${ja[0].num}. Emitir mesmo assim?`)) return;
   }
   _emitir = { tipo, cot };
   document.getElementById('em-titulo').textContent = tipo === 'FT' ? 'Emitir Factura' : 'Emitir Venda a Dinheiro';
@@ -2475,10 +2427,10 @@ function confirmarEmitir() {
   registarSeqDoc(tipo, seqDeNum(num));
   fecharModal();
   _emitir = null;
-  showToast(`${TIPOS_DOC[tipo].nome} ${num} emitida.${movsStock.length ? ' Stock actualizado.' : ''}`);
+  showToast(`${TIPOS_DOC[tipo].nome} ${num} emitida.`);
   escolherTipoDoc('COT');
   switchTab('documentos');
-  setTimeout(sincronizarTudo, 500);
+  setTimeout(sincronizarTudo, 800);
 }
 let _reciboDe = null;
 function abrirRecibo(idEnc) {
@@ -2513,14 +2465,14 @@ function confirmarRecibo() {
     facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
   guardarDoc(doc);
-  registarLog('DOC_RECIBO', 'Recibo', num, `Factura ${f.num} · Recebido ${fmt(valor)} ${f.moeda} · Saldo ${fmt(doc.saldoApos)}`);
+  registarLog('DOC_RECIBO', 'Recibo', num, `Factura ${f.num} · Recebido ${fmt(valor)} ${f.moeda}`);
   registarSeqDoc('RC', seqDeNum(num));
   fecharModal();
   _reciboDe = null;
-  showToast(`Recibo ${num} emitido. Saldo: ${fmt(doc.saldoApos)} ${f.moeda}`);
+  showToast(`Recibo ${num} emitido.`);
   escolherTipoDoc('COT');
   renderDocList();
-  setTimeout(sincronizarTudo, 500);
+  setTimeout(sincronizarTudo, 800);
 }
 function previewDoc(idEnc) {
   const d = getDocs().find(x => x.id === decodeURIComponent(idEnc));
@@ -2553,10 +2505,10 @@ function anularDoc(idEnc) {
     if (movsStock.length) { setProdutos(prods); const ms = getMovs(); setMovs(movsStock.concat(ms)); }
   }
   guardarDoc(d, movsStock);
-  registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, 'Total ' + fmt(d.total) + (movsStock.length ? ' · stock reposto' : ''));
+  registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, 'Total ' + fmt(d.total));
   renderDocList();
-  showToast('Documento anulado.' + (movsStock.length ? ' Stock reposto.' : ''));
-  setTimeout(sincronizarTudo, 500);
+  showToast('Documento anulado.');
+  setTimeout(sincronizarTudo, 800);
 }
 function renderDocList() {
   const wrap = document.getElementById('doc-list-wrap');
@@ -2594,7 +2546,6 @@ function renderDocList() {
   }).join('') + '</div>';
 }
 
-/* ───────────── BUILD DOC ───────────── */
 let _docPreview = null;
 function gerarPreview() { document.getElementById('cot-preview').innerHTML = buildDoc(_docPreview || undefined); }
 function buildDoc(d) {
@@ -2890,7 +2841,6 @@ function showToast(msg) {
   t._t=setTimeout(()=>{ t.style.opacity='0'; }, 3000);
 }
 
-/* ───────────── BUILD RECIBO ───────────── */
 function buildRecibo(d) {
   const cor = document.getElementById('cfg-cor').value || '#1a4fa0';
   const empNome = lsv('emp-nome') || 'Empresa Emissora';
@@ -2948,7 +2898,6 @@ function buildRecibo(d) {
   return `<div class="cot-pages"><div class="cot-doc cot-page"><div class="cot-doc-body">${topo}</div>${rod}</div></div>`;
 }
 
-/* ───────────── RESUMOS ───────────── */
 let _resInit = false;
 function iniciarResumos() { if (!_resInit) { _resInit = true; periodoRapido('mes'); } else renderResumos(); }
 function periodoRapido(p) {
@@ -3051,7 +3000,6 @@ function exportarMovimentosCSV() {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
-/* ───────────── UTILIZADORES ───────────── */
 let _usuarios = [];
 function rolesQueEuPossoCriar() { if (!SESSAO) return []; return SESSAO.role === 'master' ? ['master','admin','usuario','cotacionario'] : []; }
 function possoGerir(roleAlvo) { return rolesQueEuPossoCriar().includes(roleAlvo); }
@@ -3152,7 +3100,6 @@ async function alterarMinhaSenha() {
   showToast('Alterada.');
 }
 
-/* ───────────── LOG ───────────── */
 const LOG_ACOES = {
   LOGIN_OK:['AUTH','Início de sessão'], LOGIN_FALHA:['AUTH','Login falhado'], LOGIN_BLOQUEADO:['AUTH','Login bloqueado'],
   AUTH_LOGIN_OFFLINE:['AUTH','Login offline'], AUTH_LOGOUT:['AUTH','Fim de sessão'], AUTH_EXPIRADA:['AUTH','Sessão expirada'], ACESSO_NEGADO:['AUTH','Acesso negado'],
@@ -3247,7 +3194,7 @@ function renderLogs(mais) {
   else if (mais === undefined || mais === null) _logMostrar = 300;
   _logsVista = filtrarLogs();
   const pend = getLogs().filter(e => !e.env).length;
-  document.getElementById('log-info').textContent = `${_logsVista.length} registo(s) · origem: ${_logsOrigem === 'servidor' ? 'BD (todos os dispositivos)' : 'local'}` + (pend ? ` · ${pend} por enviar` : '') + (_nArquivos ? ` · ${_nArquivos} arquivo(s)` : '');
+  document.getElementById('log-info').textContent = `${_logsVista.length} registo(s) · origem: ${_logsOrigem === 'servidor' ? 'BD (todos os dispositivos)' : 'local'}` + (pend ? ` · ${pend} por enviar` : '');
   if (!_logsVista.length) { wrap.innerHTML = '<p style="font-size:12px;color:var(--muted)">Sem registos.</p>'; return; }
   const cor = { AUTH: 'tag-FT', COT: 'tag-FT', DOC: 'tag-VD', IMPRESSAO: 'tag-RC', CAD: 'tag-RC', CFG: 'tag-VD', USR: 'tag-VD', SYS: 'st-Anulado' };
   const linhas = _logsVista.slice(0, _logMostrar).map(e => `<tr>
@@ -3259,44 +3206,6 @@ function renderLogs(mais) {
     <td title="${esc(e.dev)}">${e.env ? '✔' : '⏳'}</td></tr>`).join('');
   wrap.innerHTML = `<table class="res-table"><thead><tr><th>Data/hora</th><th>Utilizador</th><th>Perfil</th><th>Operação</th><th>Entidade</th><th>Ref.</th><th>Detalhe</th><th></th></tr></thead><tbody>${linhas}</tbody></table>` +
     (_logsVista.length > _logMostrar ? `<div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="renderLogs(true)">Mostrar mais (${_logsVista.length - _logMostrar})</button></div>` : '');
-}
-function arqDataPadrao() { const d = new Date(); d.setDate(d.getDate() - 365); return dataLocalISO(d); }
-function arqErro(r) { return (r && r.error) ? r.error : 'Sem ligação.'; }
-async function simularArquivo() {
-  const est = document.getElementById('arq-estado'), data = gv('arq-data');
-  if (!data) { est.textContent = 'Escolha a data.'; return; }
-  est.textContent = 'A calcular...';
-  const r = await dbCallRaw('archiveLogs', { antesDe: data, simular: true });
-  est.innerHTML = (r && r.ok) ? `${r.candidatos} registo(s) anteriores a ${esc(fmtDate(data))}.` : '⚠️ ' + esc(arqErro(r));
-}
-async function arquivarLogsAgora() {
-  const est = document.getElementById('arq-estado'), data = gv('arq-data');
-  if (!data) { est.textContent = 'Escolha a data.'; return; }
-  if (!confirm(`Arquivar anteriores a ${fmtDate(data)}?`)) return;
-  let total = 0, ultimo = null;
-  for (let ronda = 0; ronda < 10; ronda++) {
-    est.textContent = `A arquivar... ${total} movidos`;
-    const r = await dbCallRaw('archiveLogs', { antesDe: data });
-    if (!r || !r.ok) { est.innerHTML = '⚠️ ' + esc(arqErro(r)); break; }
-    total += r.arquivadas; ultimo = r;
-    if (!r.restantes || !r.arquivadas) break;
-  }
-  if (ultimo && ultimo.ok) est.innerHTML = total ? `${total} arquivado(s).` : 'Nada a arquivar.';
-  carregarArquivos(); carregarLogs();
-}
-async function carregarArquivos() {
-  const wrap = document.getElementById('arq-lista');
-  if (!wrap) return;
-  if (!gv('arq-data')) document.getElementById('arq-data').value = arqDataPadrao();
-  if (!(temDB() && SESSAO && SESSAO.token && _online)) { wrap.innerHTML = ''; return; }
-  const r = await dbCallRaw('listArchives', {});
-  if (!r || !r.ok || !Array.isArray(r.arquivos)) { wrap.innerHTML = ''; return; }
-  _nArquivos = r.arquivos.length;
-  wrap.innerHTML = r.arquivos.length ? `<table class="res-table"><thead><tr><th>Ficheiro</th><th>De</th><th>Até</th><th class="r">Registos</th><th></th></tr></thead><tbody>` +
-    r.arquivos.map(a => `<tr><td>${esc(a.nome)}</td><td>${esc(fmtDate(a.de))}</td><td>${esc(fmtDate(a.ate))}</td><td class="r">${+a.linhas || 0}</td>
-      <td>${/^https:\/\/docs\.google\.com\//.test(a.url || '') ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">Abrir</a>` : ''}</td></tr>`).join('') + '</tbody></table>'
-    : '<p style="font-size:12px;color:var(--muted)">Sem arquivos.</p>';
-  renderLogs();
 }
 function analisarIntegridade(lista) {
   const porDev = {};
