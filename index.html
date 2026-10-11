@@ -421,6 +421,35 @@ body.locked{overflow:hidden}
     <div id="usr-list" class="res-wrap"><p style="font-size:12px;color:var(--muted)">A carregar...</p></div>
   </div>
 
+  <div class="card" id="card-logs" data-perm="db">
+    <div class="card-title">📜 Registo de Operações (Log de Auditoria)</div>
+    <div class="alert alert-info" style="font-size:12px;line-height:1.6">
+      Regista <strong>todas as operações</strong> (entradas/saídas, cotações, facturas, VD, recibos, anulações, impressões e reimpressões, produtos, clientes, configurações, utilizadores, offline/online). Os registos só se acrescentam — não podem ser editados nem apagados — e cada um tem uma <em>cadeia de hashes</em> para detectar adulterações.
+    </div>
+    <div class="doc-filtros">
+      <div class="field"><label>De</label><input type="date" id="log-de" onchange="carregarLogs()"></div>
+      <div class="field"><label>Até</label><input type="date" id="log-ate" onchange="carregarLogs()"></div>
+      <div class="field"><label>Utilizador</label><select id="log-user" onchange="renderLogs()"><option value="">Todos</option></select></div>
+      <div class="field"><label>Tipo de operação</label>
+        <select id="log-grupo" onchange="renderLogs()">
+          <option value="">Todas</option><option value="AUTH">Entradas / saídas</option><option value="COT">Cotações</option><option value="DOC">Facturas · VD · Recibos</option>
+          <option value="IMPRESSAO">Impressões / reimpressões</option><option value="CAD">Produtos e clientes</option><option value="CFG">Configurações</option>
+          <option value="USR">Utilizadores</option><option value="SYS">Sistema / offline</option>
+        </select></div>
+      <div class="field"><label>Pesquisar</label><input type="text" id="log-q" placeholder="nº, cliente, detalhe..." oninput="renderLogs()"></div>
+    </div>
+    <div class="btn-bar" style="margin-bottom:10px">
+      <button class="btn btn-secondary btn-sm" onclick="carregarLogs()">🔄 Actualizar</button>
+      <button class="btn btn-secondary btn-sm" onclick="verificarIntegridadeLog()">🔐 Verificar integridade</button>
+      <button class="btn btn-primary btn-sm" onclick="exportarLogXML()">⬇️ Exportar XML (inspecção)</button>
+      <button class="btn btn-secondary btn-sm" onclick="exportarLogCSV()">⬇️ Exportar CSV</button>
+      <label style="font-size:12px;display:inline-flex;align-items:center;gap:6px;margin-left:6px"><input type="checkbox" id="log-incl-docs" checked> incluir documentos emitidos no XML</label>
+    </div>
+    <div id="log-info" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
+    <div id="log-integridade" style="display:none;font-size:12px;margin-bottom:8px"></div>
+    <div id="log-list" class="res-wrap"></div>
+  </div>
+
   <div class="card" data-perm="db">
     <div class="card-title">☁️ Base de Dados (Google Sheets)</div>
     <div class="alert alert-info" id="db-status-box">
@@ -824,7 +853,7 @@ async function confirmarLogin() {
     // Script antigo ou sem ligação: acesso offline (quem já entrou aqui) ou credenciais de 1.º acesso
     if (verificarLimiteOffline()) return;   // mais de 8 h sem ligação: bloqueado
     const off = verificarOffline(user, pass);
-    if (off) { SESSAO = Object.assign({ token: '' }, off); entrarNoSistema(); showToast('📴 Modo offline — sem ligação à Base de Dados.'); return; }
+    if (off) { SESSAO = Object.assign({ token: '' }, off); registarLog('AUTH_LOGIN_OFFLINE', 'Sessão', off.username, 'Início de sessão sem ligação'); entrarNoSistema(); showToast('📴 Modo offline — sem ligação à Base de Dados.'); return; }
     if (!localStorage.getItem('authAtivo') && user === LOGIN_USER && pass === LOGIN_PASS) {
       SESSAO = { username: user, nome: 'Administrador', role: 'master', token: '', legacy: true };
       entrarNoSistema(); return;
@@ -851,13 +880,16 @@ function mostrarLogin(msg) {
 
 function terminarSessao() {
   if (!confirm('Terminar sessão?')) return;
-  if (SESSAO && SESSAO.token) dbCall('logout', {});
+  registarLog('AUTH_LOGOUT', 'Sessão', SESSAO ? SESSAO.username : '', 'Fim de sessão pelo utilizador');
+  enviarLogs();
+  { const tk = SESSAO && SESSAO.token; if (tk) setTimeout(() => dbCallRaw('logout', { token: tk }), 1500); }
   _configDesbloqueado = false;
   mostrarLogin();
 }
 
 function sessaoExpirada(msg) {
   if (!SESSAO) return;
+  registarLog('AUTH_EXPIRADA', 'Sessão', SESSAO.username, 'Sessão expirada no servidor');
   fecharModal();
   mostrarLogin(msg || 'Sessão expirada. Inicie sessão novamente.');
 }
@@ -1022,6 +1054,7 @@ async function dbCall(action, payload) {
 /* ────────── Estado de ligação e limite de 8 horas */
 function marcarOnline() {
   const estavaOffline = !_online;
+  if (estavaOffline) registarLog('SYS_ONLINE', 'Sistema', '', 'Ligação restabelecida (' + getFila().length + ' alteração(ões) por enviar)');
   _online = true;
   localStorage.setItem('ultimoOnline', String(Date.now()));
   localStorage.setItem('relogioMax', String(Date.now()));
@@ -1032,6 +1065,7 @@ function marcarOnline() {
 }
 function marcarOffline() {
   if (!temDB()) return;
+  if (_online) registarLog('SYS_OFFLINE', 'Sistema', '', 'Sem ligação à Base de Dados');
   _online = false;
   if (!localStorage.getItem('ultimoOnline')) localStorage.setItem('ultimoOnline', String(Date.now()));
   atualizarBannerOffline();
@@ -1064,6 +1098,7 @@ function verificarLimiteOffline() {
   else if (offlineMs() > LIMITE_OFFLINE_MS) motivo = 'Passaram mais de 8 horas sem ligação à Base de Dados. A aplicação só volta a funcionar depois de ligar à internet e sincronizar.';
   if (!motivo) { localStorage.setItem('relogioMax', String(Math.max(maxRel, agora))); return false; }
   document.getElementById('ob-msg').textContent = motivo;
+  if (document.getElementById('offline-bloqueio').hidden) registarLog('SYS_BLOQUEIO', 'Sistema', '', motivo);
   document.getElementById('offline-bloqueio').hidden = false;
   return true;
 }
@@ -1152,6 +1187,7 @@ function resolverConflitoFila(it, r) {
 }
 function avisarRenumeracao(txt) {
   const h = JSON.parse(localStorage.getItem('renumeracoes') || '[]');
+  registarLog('SYS_RENUMERADA', 'Sistema', txt, 'Número já existia online; renumerado');
   h.unshift({ quando: new Date().toISOString(), txt }); localStorage.setItem('renumeracoes', JSON.stringify(h.slice(0, 30)));
   showToast('🔢 Numeração ajustada (já existia online): ' + txt);
   alert('Numeração ajustada ao voltar online\n\n' + txt + '\n\nO número original já tinha sido usado noutro documento na Base de Dados. Se já o imprimiu ou enviou, reimprima o documento com o novo número.');
@@ -1237,6 +1273,7 @@ async function sincronizarTudo() {
     setDbStatus(false, `Há ${getFila().length} alteração(ões) por enviar. A tentar novamente...`);
     return;
   }
+  enviarLogs();
   // 2) Depois lê o que está online
   const r = await dbCallRaw('getAll', {});
   if (!r || !r.ok) { setDbStatus(false, 'Falha ao sincronizar.'); return; }
@@ -1486,6 +1523,7 @@ function switchTab(id) {
   if (id==='resumos') iniciarResumos();
   if (id==='produtos') renderProdList();
   if (id==='config' && pode('utilizadores')) carregarUsuarios();
+  if (id==='config' && pode('db')) carregarLogs();
 }
 
 /* ────────── PROTECÇÃO POR PIN (separador Configurações) */
@@ -1629,7 +1667,8 @@ function salvarConfig() {
 
   const dbUrlAntes = getDbUrl();
   const dbUrlNovo = gv('cfg-db-url').trim();
-  if (dbUrlNovo !== dbUrlAntes) localStorage.setItem('cfg-db-url', dbUrlNovo);
+  if (dbUrlNovo !== dbUrlAntes) { localStorage.setItem('cfg-db-url', dbUrlNovo); registarLog('CFG_DB_URL', 'Configurações', 'Base de Dados', 'URL da Base de Dados alterado'); }
+  registarLog('CFG_ALTERAR', 'Configurações', 'Empresa', 'Dados da empresa / aparência / numeração');
 
   showToast('✅ Configurações guardadas!');
 
@@ -1659,6 +1698,7 @@ function carregarConfig() {
 function handleLogo(e) { if(e.target.files[0]) loadLogo(e.target.files[0]); }
 
 function loadLogo(file) {
+  registarLog('CFG_LOGO', 'Configurações', 'Logotipo', 'Novo logotipo carregado: ' + (file && file.name ? file.name : ''));
   // SVG é preservado tal como está (vector puro) — nunca passa por canvas,
   // para não perder qualidade nem ficar pixelizado no PDF exportado.
   const isSvg = file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
@@ -1773,6 +1813,7 @@ function showLogoPreview(src) {
   document.getElementById('logo-text').textContent = 'Clique para substituir';
 }
 function removerLogo() {
+  registarLog('CFG_LOGO', 'Configurações', 'Logotipo', 'Removido');
   logoData=''; localStorage.removeItem('logoData');
   document.getElementById('logo-preview').style.display='none';
   document.getElementById('logo-text').textContent='Clique aqui ou arraste o logotipo';
@@ -1789,6 +1830,7 @@ function guardarCliente() {
   if (idx>=0) { cli.id = clientes[idx].id; clientes[idx]=cli; } else clientes.unshift(cli);
   localStorage.setItem('clientes', JSON.stringify(clientes));
   showToast('✅ Cliente guardado!');
+  registarLog('CLI_GUARDAR', 'Cliente', nome, cli.nuit ? 'NUIT ' + cli.nuit : '');
   if (temDB()) dbCall('saveCliente', { cliente: cli });
 }
 
@@ -1827,6 +1869,7 @@ function selecionarCliente(id) {
 }
 
 function apagarCliente(id) {
+  { const cl = JSON.parse(localStorage.getItem('clientes')||'[]').find(c=>c.id===id); registarLog('CLI_APAGAR', 'Cliente', cl ? cl.nome : id, ''); }
   let cls = JSON.parse(localStorage.getItem('clientes')||'[]').filter(c=>c.id!==id);
   localStorage.setItem('clientes', JSON.stringify(cls));
   renderModalClientes();
@@ -1851,6 +1894,7 @@ function guardarProdutosDaCotacao() {
     alterados.push(prod);
   });
   setProdutos(prods);
+  if (alterados.length) registarLog('PROD_AUTO', 'Produto', '', `${alterados.length} produto(s) actualizados a partir da cotação ${gv('cot-num')}`);
   if (temDB()) alterados.forEach(p => dbCall('saveProduto', { produto: p }));
 }
 
@@ -1939,6 +1983,7 @@ function salvarProduto() {
   if (editId) { const i=prods.findIndex(p=>p.id===+editId); if(i>=0) prods[i]=prod; }
   else prods.unshift(prod);
   setProdutos(prods);
+  registarLog(editId ? 'PROD_EDITAR' : 'PROD_CRIAR', 'Produto', ref || desc, `${desc} · ${fmt(prod.pu)} · IVA ${prod.iva}%`);
   fecharModal();
   renderProdList();
   showToast('✅ Produto guardado!');
@@ -1947,6 +1992,7 @@ function salvarProduto() {
 
 function apagarProduto(id) {
   if (!confirm('Apagar este produto?')) return;
+  { const pr = getProdutos().find(p=>p.id===id); registarLog('PROD_APAGAR', 'Produto', pr ? (pr.ref || pr.desc) : id, pr ? pr.desc : ''); }
   setProdutos(getProdutos().filter(p=>p.id!==id));
   renderProdList();
   if (temDB()) dbCall('deleteProduto', { id });
@@ -2033,6 +2079,7 @@ function confirmarGuardar() {
   registarSeq(seqDeNum(num));   // só sobe — editar uma cotação antiga já não faz recuar a numeração
   // guardar produtos automaticamente
   if (pode('produtos')) guardarProdutosDaCotacao();
+  registarLog(anterior ? 'COT_EDITAR' : 'COT_CRIAR', 'Cotação', num, `Cliente: ${cot.cliNome || '—'} · Total ${fmt(cot.total)} ${cot.moeda}`);
   fecharModal();
   showToast('✅ Cotação '+num+' guardada!' + (pode('produtos') ? ' Produtos actualizados.' : ''));
   if (temDB()) {
@@ -2097,6 +2144,7 @@ function previewCotacao(num) {
 function apagarCotacao(num) {
   if (!pode('apagarCot')) { showToast('⛔ Sem permissão para apagar cotações.'); return; }
   if (!confirm('Apagar a cotação '+num+'?')) return;
+  registarLog('COT_APAGAR', 'Cotação', num, 'Apagada pelo utilizador');
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]').filter(c=>c.num!==num);
   localStorage.setItem('cotacoes', JSON.stringify(cots));
   renderCotList();
@@ -2118,6 +2166,7 @@ async function apagarTodasCotacoes() {
   if (!confirm(`Apagar TODAS as ${cots.length} cotações guardadas? Esta acção não pode ser desfeita.`)) return;
   if (!confirm('Tem mesmo a certeza? Todas as cotações serão removidas permanentemente, incluindo na Base de Dados.')) return;
 
+  registarLog('COT_APAGAR_TODAS', 'Cotação', '*', `${cots.length} cotações apagadas`);
   // Limpa localmente de imediato
   localStorage.setItem('cotacoes', '[]');
   renderCotList();
@@ -2528,14 +2577,16 @@ function registarImpressao(d) {
     const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]');
     const i = cots.findIndex(c => c.num === d.num);
     if (i >= 0) {
+      registarLog((+cots[i].impressoes || 0) > 0 ? 'REIMPRESSAO' : 'IMPRESSAO', 'Cotação', d.num, 'Impressão nº ' + ((+cots[i].impressoes || 0) + 1));
       cots[i].impressoes = (+cots[i].impressoes || 0) + 1;
       cots[i].ultimaImpressao = agora;
       localStorage.setItem('cotacoes', JSON.stringify(cots));
       if (temDB()) dbCall('saveCotacao', { cotacao: cots[i] });
-    } else { _impressoesForm++; }
+    } else { registarLog(_impressoesForm > 0 ? 'REIMPRESSAO' : 'IMPRESSAO', 'Cotação', d.num, 'Impressão antes de guardar'); _impressoesForm++; }
   } else {
     const doc = getDocs().find(x => x.id === d.id);
     if (doc) {
+      registarLog((+doc.impressoes || 0) > 0 ? 'REIMPRESSAO' : 'IMPRESSAO', TIPOS_DOC[doc.tipo].nome, doc.num, 'Impressão nº ' + ((+doc.impressoes || 0) + 1));
       doc.impressoes = (+doc.impressoes || 0) + 1;
       doc.ultimaImpressao = agora;
       guardarDoc(doc);
@@ -2799,6 +2850,7 @@ function confirmarEmitir() {
     valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
   guardarDoc(doc);
+  registarLog('DOC_EMITIR', TIPOS_DOC[tipo].nome, num, `Cliente: ${doc.cliNome || '—'} · Total ${fmt(doc.total)} ${doc.moeda}${doc.origem ? ' · Origem cotação ' + doc.origem : ''}`);
   registarSeqDoc(tipo, seqDeNum(num));
   fecharModal();
   _emitir = null;
@@ -2842,6 +2894,7 @@ function confirmarRecibo() {
     facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
   guardarDoc(doc);
+  registarLog('DOC_RECIBO', 'Recibo', num, `Factura ${f.num} · Recebido ${fmt(valor)} ${f.moeda} (${doc.metodo}) · Saldo ${fmt(doc.saldoApos)}`);
   registarSeqDoc('RC', seqDeNum(num));
   fecharModal();
   _reciboDe = null;
@@ -2868,6 +2921,7 @@ function anularDoc(idEnc) {
   if (!confirm(`Anular ${TIPOS_DOC[d.tipo].nome} ${d.num}?\nO documento fica registado como ANULADO e deixa de contar nos resumos.`)) return;
   d.estado = 'Anulado'; d.anuladoEm = new Date().toISOString();
   guardarDoc(d);
+  registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, `Total ${fmt(d.total)} ${d.moeda}`);
   renderDocList();
   showToast('🚫 Documento anulado.');
 }
@@ -3213,6 +3267,307 @@ async function alterarMinhaSenha() {
   guardarVerificadorOffline(SESSAO.username, n1, SESSAO);
   fecharModal();
   showToast('🔑 Palavra-passe alterada.');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   REGISTO DE OPERAÇÕES (LOG DE AUDITORIA)
+   ────────────────────────────────────────────────────────────────
+   • Cada operação cria uma entrada guardada neste dispositivo e enviada
+     para a folha "Logs" da Sheet (também em modo offline: fica pendente).
+   • Só se acrescenta; nada se edita ou apaga.
+   • Cadeia de hashes por dispositivo: hash = SHA-256(prev | campos...).
+   ════════════════════════════════════════════════════════════════ */
+const LOG_ACOES = {
+  LOGIN_OK:['AUTH','Início de sessão'], LOGIN_FALHA:['AUTH','Tentativa de login falhada'], LOGIN_BLOQUEADO:['AUTH','Login bloqueado (tentativas)'],
+  AUTH_LOGIN_OFFLINE:['AUTH','Início de sessão offline'], AUTH_LOGOUT:['AUTH','Fim de sessão'], AUTH_EXPIRADA:['AUTH','Sessão expirada'], ACESSO_NEGADO:['AUTH','Acesso negado'],
+  COT_CRIAR:['COT','Cotação criada'], COT_EDITAR:['COT','Cotação alterada'], COT_APAGAR:['COT','Cotação apagada'], COT_APAGAR_TODAS:['COT','Todas as cotações apagadas'],
+  DOC_EMITIR:['DOC','Documento emitido'], DOC_RECIBO:['DOC','Recibo emitido'], DOC_ANULAR:['DOC','Documento anulado'],
+  IMPRESSAO:['IMPRESSAO','Impressão (original)'], REIMPRESSAO:['IMPRESSAO','Reimpressão'],
+  PROD_CRIAR:['CAD','Produto criado'], PROD_EDITAR:['CAD','Produto alterado'], PROD_APAGAR:['CAD','Produto apagado'], PROD_AUTO:['CAD','Produtos actualizados a partir da cotação'],
+  CLI_GUARDAR:['CAD','Cliente guardado'], CLI_APAGAR:['CAD','Cliente apagado'],
+  CFG_ALTERAR:['CFG','Configurações alteradas'], CFG_LOGO:['CFG','Logotipo alterado'], CFG_DB_URL:['CFG','URL da Base de Dados alterado'],
+  USR_CRIAR:['USR','Utilizador criado'], USR_EDITAR:['USR','Utilizador alterado'], USR_APAGAR:['USR','Utilizador apagado'], USR_SENHA:['USR','Palavra-passe alterada'],
+  SYS_OFFLINE:['SYS','Passou a offline'], SYS_ONLINE:['SYS','Ligação restabelecida'], SYS_BLOQUEIO:['SYS','Bloqueio (limite offline/relógio)'], SYS_RENUMERADA:['SYS','Numeração ajustada após conflito'],
+  LOG_EXPORT:['SYS','Exportação do registo']
+};
+function grupoLog(a) { return (LOG_ACOES[a] || ['SYS'])[0]; }
+function rotuloLog(a) { return (LOG_ACOES[a] || [0, a])[1]; }
+
+function idDispositivo() {
+  let d = localStorage.getItem('deviceId');
+  if (!d) { d = 'dev-' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4); localStorage.setItem('deviceId', d); }
+  return d;
+}
+function getLogs() { try { return JSON.parse(localStorage.getItem('auditLog') || '[]'); } catch (e) { return []; } }
+function setLogs(l) { localStorage.setItem('auditLog', JSON.stringify(l)); }
+function conteudoHashLog(e) { return [e.prev, e.id, e.ts, e.user, e.role, e.acao, e.entidade, e.ref, e.detalhe, e.dev, e.seq].join('|'); }
+
+function registarLog(acao, entidade, ref, detalhe) {
+  try {
+    const seq = (+localStorage.getItem('logSeq') || 0) + 1;
+    const prev = localStorage.getItem('logHashUlt') || '';
+    const e = { id: novoUid(), ts: new Date().toISOString(), user: SESSAO ? SESSAO.username : '(sem sessão)', role: SESSAO ? SESSAO.role : '',
+                acao, entidade: entidade || '', ref: String(ref == null ? '' : ref), detalhe: String(detalhe || '').slice(0, 500), dev: idDispositivo(), seq, prev };
+    e.hash = sha256(conteudoHashLog(e));
+    const l = getLogs(); l.push(e);
+    if (l.length > 6000) {                       // limpa só entradas antigas JÁ enviadas
+      let excesso = l.length - 4500;
+      for (let i = 0; i < l.length && excesso > 0; i++) if (l[i].env) { l.splice(i, 1); i--; excesso--; }
+    }
+    setLogs(l);
+    localStorage.setItem('logSeq', String(seq));
+    localStorage.setItem('logHashUlt', e.hash);
+    agendarEnvioLogs();
+  } catch (err) { console.warn('[LOG]', err); }
+}
+
+let _logTimer = null, _logEnvioEmCurso = false;
+function agendarEnvioLogs() {
+  clearTimeout(_logTimer);
+  _logTimer = setTimeout(enviarLogs, 3000);
+}
+async function enviarLogs() {
+  if (_logEnvioEmCurso || !temDB() || !_online || !SESSAO) return;
+  _logEnvioEmCurso = true;
+  try {
+    for (let rodada = 0; rodada < 20; rodada++) {
+      const pend = getLogs().filter(e => !e.env).slice(0, 200);
+      if (!pend.length) break;
+      const r = await dbCallRaw('saveLogs', { logs: pend.map(({ env, ...resto }) => resto) });
+      if (!r || !r.ok) break;                    // sem ligação, sem permissão ou script antigo: tenta mais tarde
+      const ids = new Set(pend.map(e => e.id));
+      const l = getLogs(); l.forEach(e => { if (ids.has(e.id)) e.env = 1; }); setLogs(l);
+    }
+  } finally { _logEnvioEmCurso = false; }
+}
+
+/* ────────── Visualização no separador Configurações */
+let _logsBase = [], _logsVista = [], _logsOrigem = 'local';
+
+function diaLocal(ts) { return dataLocalISO(new Date(ts)); }
+async function carregarLogs() {
+  const wrap = document.getElementById('log-list');
+  if (!wrap) return;
+  if (!gv('log-de')) { const h = new Date(); document.getElementById('log-de').value = dataLocalISO(new Date(h.getFullYear(), h.getMonth(), 1)); document.getElementById('log-ate').value = dataLocalISO(h); }
+  const de = gv('log-de'), ate = gv('log-ate');
+  let lista = [], origem = 'local';
+  if (temDB() && SESSAO && SESSAO.token && _online) {
+    const dia = (iso, d) => { const x = new Date(iso + 'T12:00:00'); x.setDate(x.getDate() + d); return dataLocalISO(x); };
+    const r = await dbCallRaw('listLogs', { de: de ? dia(de, -1) : '', ate: ate ? dia(ate, 1) : '', limite: 20000 });
+    if (r && r.ok && Array.isArray(r.logs)) { lista = r.logs.map(x => Object.assign({}, x, { seq: +x.seq || 0, env: 1 })); origem = 'servidor'; }
+  }
+  const ids = new Set(lista.map(x => x.id));
+  getLogs().forEach(e => { if (!ids.has(e.id) && (origem === 'local' || !e.env)) lista.push(e); });
+  lista = lista.filter(e => (!de || diaLocal(e.ts) >= de) && (!ate || diaLocal(e.ts) <= ate));
+  lista.sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+  _logsBase = lista; _logsOrigem = origem;
+  const sel = document.getElementById('log-user'), atual = sel.value;
+  const users = [...new Set(lista.map(e => e.user).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos</option>' + users.map(u => `<option ${u === atual ? 'selected' : ''}>${esc(u)}</option>`).join('');
+  renderLogs();
+}
+
+function filtrarLogs() {
+  const u = gv('log-user'), g = gv('log-grupo'), q = gv('log-q').toLowerCase().trim();
+  return _logsBase.filter(e => (!u || e.user === u) && (!g || grupoLog(e.acao) === g) &&
+    (!q || [e.ref, e.detalhe, e.entidade, e.user, rotuloLog(e.acao)].join(' ').toLowerCase().includes(q)));
+}
+
+let _logMostrar = 300;
+function renderLogs(mais) {
+  const wrap = document.getElementById('log-list');
+  if (!wrap) return;
+  if (mais) _logMostrar += 300; else if (mais === undefined) _logMostrar = 300;
+  _logsVista = filtrarLogs();
+  const pend = getLogs().filter(e => !e.env).length;
+  document.getElementById('log-info').textContent =
+    `${_logsVista.length} registo(s) no período · origem: ${_logsOrigem === 'servidor' ? 'Base de Dados (todos os dispositivos)' : 'apenas este dispositivo (sem ligação)'}` + (pend ? ` · ${pend} por enviar` : '');
+  if (!_logsVista.length) { wrap.innerHTML = '<p style="font-size:12px;color:var(--muted)">Sem registos para os filtros escolhidos.</p>'; return; }
+  const cor = { AUTH: 'tag-FT', COT: 'tag-FT', DOC: 'tag-VD', IMPRESSAO: 'tag-RC', CAD: 'tag-RC', CFG: 'tag-VD', USR: 'tag-VD', SYS: 'st-Anulado' };
+  const linhas = _logsVista.slice(0, _logMostrar).map(e => `<tr>
+    <td>${esc(fmtDate(diaLocal(e.ts)))} ${esc(new Date(e.ts).toTimeString().slice(0, 8))}</td>
+    <td>${esc(e.user)}</td><td>${esc(e.role)}</td>
+    <td><span class="tag ${cor[grupoLog(e.acao)] || 'st-Anulado'}">${esc(rotuloLog(e.acao))}</span></td>
+    <td>${esc(e.entidade)}</td><td>${esc(e.ref)}</td>
+    <td style="white-space:normal;min-width:180px">${esc(e.detalhe)}</td>
+    <td title="${esc(e.dev)}">${e.env ? '✔' : '⏳'}</td></tr>`).join('');
+  wrap.innerHTML = `<table class="res-table"><thead><tr><th>Data/hora</th><th>Utilizador</th><th>Perfil</th><th>Operação</th><th>Entidade</th><th>Referência</th><th>Detalhe</th><th></th></tr></thead><tbody>${linhas}</tbody></table>` +
+    (_logsVista.length > _logMostrar ? `<div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="renderLogs(true)">Mostrar mais (${_logsVista.length - _logMostrar})</button></div>` : '');
+}
+
+/* ────────── Integridade (cadeia de hashes) */
+function analisarIntegridade(lista) {
+  const porDev = {};
+  lista.forEach(e => { (porDev[e.dev || '?'] = porDev[e.dev || '?'] || []).push(e); });
+  const falhas = [], lacunas = [];
+  let verificadas = 0;
+  Object.keys(porDev).forEach(dev => {
+    const arr = porDev[dev].sort((a, b) => (+a.seq) - (+b.seq));
+    arr.forEach((e, i) => {
+      if (!e.hash) return;
+      verificadas++;
+      if (sha256(conteudoHashLog(e)) !== e.hash) falhas.push(`${dev} #${e.seq} (${e.acao} ${e.ref}): conteúdo alterado`);
+      if (i > 0) {
+        const a = arr[i - 1];
+        if (+e.seq === +a.seq + 1) { if (e.prev !== a.hash) falhas.push(`${dev} #${e.seq}: ligação à entrada anterior quebrada`); }
+        else if (+e.seq > +a.seq + 1) lacunas.push(`${dev}: faltam as entradas #${+a.seq + 1} a #${+e.seq - 1}`);
+      }
+    });
+  });
+  return { verificadas, falhas, lacunas, ok: !falhas.length && !lacunas.length };
+}
+function verificarIntegridadeLog() {
+  const r = analisarIntegridade(_logsBase.slice());
+  const box = document.getElementById('log-integridade');
+  box.style.display = 'block';
+  box.className = 'alert ' + (r.ok ? 'alert-success' : 'alert-danger');
+  box.innerHTML = r.ok ? `✅ Integridade confirmada: ${r.verificadas} registo(s) verificados, sem alterações nem lacunas.`
+    : `⚠️ Foram detectados problemas em ${r.verificadas} registo(s) verificados:<br>` + r.falhas.concat(r.lacunas).slice(0, 15).map(x => '• ' + esc(x)).join('<br>');
+  return r;
+}
+
+/* ────────── Exportação XML (inspecção) e CSV */
+function xmlEsc(v) { return String(v == null ? '' : v).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function xmlN(v) { return (Math.round((+v || 0) * 100) / 100).toFixed(2); }
+const MOEDA_ISO = { MT: 'MZN', USD: 'USD', EUR: 'EUR', ZAR: 'ZAR' };
+function tag(nome, valor) { return valor === '' || valor == null ? '' : `<${nome}>${xmlEsc(valor)}</${nome}>`; }
+
+function xmlDocumentos(de, ate) {
+  const dentro = d => (!de || String(d.data || '').slice(0, 10) >= de) && (!ate || String(d.data || '').slice(0, 10) <= ate);
+  const docs = getDocs().filter(dentro);
+  const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]').filter(dentro);
+  const linhasXml = (items, tipoValor) => (items || []).map((it, i) => `
+          <Line>
+            <LineNumber>${i + 1}</LineNumber>
+            ${tag('ProductCode', it.ref)}${tag('ProductDescription', it.desc)}
+            <Quantity>${xmlN(it.qtd)}</Quantity>${tag('UnitOfMeasure', it.un)}
+            <UnitPrice>${xmlN(it.pu)}</UnitPrice>
+            <${tipoValor}>${xmlN((+it.qtd || 0) * (+it.pu || 0))}</${tipoValor}>
+            <Tax><TaxType>IVA</TaxType><TaxPercentage>${xmlN(it.iva)}</TaxPercentage></Tax>
+          </Line>`).join('');
+  const cliente = d => `<Customer>${tag('CustomerName', d.cliNome)}${tag('CustomerTaxID', d.cliNuit)}${tag('Address', [d.cliEnd, d.cliCidade].filter(Boolean).join(', '))}${tag('Telephone', d.cliTel)}${tag('Email', d.cliEmail)}</Customer>`;
+  const fat = docs.filter(d => d.tipo === 'FT' || d.tipo === 'VD');
+  const rec = docs.filter(d => d.tipo === 'RC');
+  const valido = d => d.estado !== 'Anulado';
+  const totFat = fat.filter(valido).reduce((a, d) => a + (+d.sub - +d.desconto || 0), 0);
+  const invoices = fat.map(d => `
+        <Invoice>
+          <InvoiceNo>${xmlEsc(d.num)}</InvoiceNo>
+          <DocumentStatus><InvoiceStatus>${d.estado === 'Anulado' ? 'A' : 'N'}</InvoiceStatus>${tag('InvoiceStatusDate', d.anuladoEm || d.savedAt)}${tag('SourceID', d.criadoPor)}</DocumentStatus>
+          <InvoiceDate>${xmlEsc(d.data)}</InvoiceDate>
+          <InvoiceType>${d.tipo}</InvoiceType>
+          <SystemEntryDate>${xmlEsc(d.savedAt)}</SystemEntryDate>
+          ${tag('SourceCotacao', d.origem)}${tag('DueDate', d.venc)}${tag('PaymentMethod', d.metodo)}
+          ${cliente(d)}${linhasXml(d.items, 'CreditAmount')}
+          <DocumentTotals><TaxPayable>${xmlN(d.iva)}</TaxPayable><Settlement><SettlementAmount>${xmlN(d.desconto)}</SettlementAmount></Settlement><NetTotal>${xmlN((+d.sub || 0) - (+d.desconto || 0))}</NetTotal><GrossTotal>${xmlN(d.total)}</GrossTotal><Currency>${MOEDA_ISO[d.moeda] || d.moeda || 'MZN'}</Currency></DocumentTotals>
+          <Printing><PrintCount>${+d.impressoes || 0}</PrintCount>${tag('LastPrint', d.ultimaImpressao)}</Printing>
+        </Invoice>`).join('');
+  const pagamentos = rec.map(d => `
+        <Payment>
+          <PaymentRefNo>${xmlEsc(d.num)}</PaymentRefNo>
+          <TransactionDate>${xmlEsc(d.data)}</TransactionDate>
+          <PaymentStatus>${d.estado === 'Anulado' ? 'A' : 'N'}</PaymentStatus>
+          ${tag('PaymentMethod', d.metodo)}${cliente(d)}
+          <SourceDocumentID>${xmlEsc(d.origem)}</SourceDocumentID>
+          <PaymentAmount>${xmlN(d.valorRecebido)}</PaymentAmount>
+          <Currency>${MOEDA_ISO[d.moeda] || d.moeda || 'MZN'}</Currency>
+          <InvoiceTotal>${xmlN(d.facturaTotal)}</InvoiceTotal><PreviouslyPaid>${xmlN(d.pagoAnterior)}</PreviouslyPaid><RemainingBalance>${xmlN(d.saldoApos)}</RemainingBalance>
+        </Payment>`).join('');
+  const orc = cots.map(c => `
+        <WorkDocument>
+          <DocumentNumber>${xmlEsc(c.num)}</DocumentNumber>
+          <WorkType>OR</WorkType>
+          <DocumentDate>${xmlEsc(c.data)}</DocumentDate>${tag('ValidUntil', c.venc)}
+          <SystemEntryDate>${xmlEsc(c.criadoEm || c.savedAt)}</SystemEntryDate>${tag('SourceID', c.criadoPor)}
+          ${cliente(c)}${linhasXml(c.items, 'DebitAmount')}
+          <DocumentTotals><TaxPayable>${xmlN(c.iva)}</TaxPayable><NetTotal>${xmlN((+c.sub || 0) - (+c.desconto || 0))}</NetTotal><GrossTotal>${xmlN(c.total)}</GrossTotal><Currency>${MOEDA_ISO[c.moeda] || c.moeda || 'MZN'}</Currency></DocumentTotals>
+          <Printing><PrintCount>${+c.impressoes || 0}</PrintCount>${tag('LastPrint', c.ultimaImpressao)}</Printing>
+        </WorkDocument>`).join('');
+  return `
+  <SourceDocuments>
+    <SalesInvoices>
+      <NumberOfEntries>${fat.length}</NumberOfEntries>
+      <TotalCredit>${xmlN(totFat)}</TotalCredit>${invoices}
+    </SalesInvoices>
+    <Payments>
+      <NumberOfEntries>${rec.length}</NumberOfEntries>${pagamentos}
+    </Payments>
+    <WorkingDocuments>
+      <NumberOfEntries>${cots.length}</NumberOfEntries>${orc}
+    </WorkingDocuments>
+  </SourceDocuments>`;
+}
+
+function construirXMLAuditoria(entradas, opts) {
+  const integ = analisarIntegridade(entradas.slice());
+  const emp = k => localStorage.getItem(k) || '';
+  const agora = new Date();
+  const entradasOrd = entradas.slice().sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  const entradasXml = entradasOrd.map(e => `
+    <LogEntry>
+      <EntryID>${xmlEsc(e.id)}</EntryID>
+      <Timestamp>${xmlEsc(e.ts)}</Timestamp>
+      <UserID>${xmlEsc(e.user)}</UserID>${tag('UserRole', e.role)}
+      <Action>${xmlEsc(e.acao)}</Action>
+      <ActionDescription>${xmlEsc(rotuloLog(e.acao))}</ActionDescription>
+      ${tag('EntityType', e.entidade)}${tag('EntityRef', e.ref)}${tag('Details', e.detalhe)}
+      <DeviceID>${xmlEsc(e.dev)}</DeviceID><Sequence>${+e.seq || 0}</Sequence>
+      <PreviousHash>${xmlEsc(e.prev)}</PreviousHash><Hash>${xmlEsc(e.hash)}</Hash>
+      <SourceSystem>${xmlEsc(e.origem || 'app')}</SourceSystem><Synchronized>${e.env ? 'true' : 'false'}</Synchronized>
+    </LogEntry>`).join('');
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ficheiro de auditoria gerado pelo Sistema de Cotação e Facturação.
+     Estrutura inspirada no SAF-T (cabeçalho, documentos de origem) com registo de operações.
+     Não é um ficheiro SAF-T certificado: confirme com a Autoridade Tributária / contabilista o formato exigido. -->
+<AuditFile xmlns="urn:cotacao-facturacao:auditfile:1.0">
+  <Header>
+    <AuditFileVersion>1.0</AuditFileVersion>
+    ${tag('CompanyName', emp('emp-nome'))}${tag('TaxRegistrationNumber', emp('emp-nuit'))}
+    <CompanyAddress>${tag('AddressDetail', emp('emp-end'))}${tag('City', emp('emp-cidade'))}${tag('Telephone', emp('emp-tel'))}${tag('Email', emp('emp-email'))}${tag('Website', emp('emp-web'))}</CompanyAddress>
+    <DefaultCurrency>${MOEDA_ISO[opts.moeda || 'MT'] || 'MZN'}</DefaultCurrency>
+    <SelectionCriteria>${tag('PeriodStart', opts.de)}${tag('PeriodEnd', opts.ate)}${tag('UserFilter', opts.user)}${tag('CategoryFilter', opts.grupo)}</SelectionCriteria>
+    <DateCreated>${agora.toISOString()}</DateCreated>
+    <ExportedBy>${xmlEsc(SESSAO ? SESSAO.username : '')}</ExportedBy>
+    <SoftwareProductName>Sistema de Cotação e Facturação</SoftwareProductName>
+    <SoftwareVersion>${xmlEsc(VERSAO_APP)}</SoftwareVersion>
+    <IntegrityCheck><Verified>${integ.ok}</Verified><EntriesChecked>${integ.verificadas}</EntriesChecked><Problems>${integ.falhas.length}</Problems><Gaps>${integ.lacunas.length}</Gaps></IntegrityCheck>
+  </Header>
+  <AuditLog>
+    <NumberOfEntries>${entradasOrd.length}</NumberOfEntries>${entradasXml}
+  </AuditLog>${opts.docs ? xmlDocumentos(opts.de, opts.ate) : ''}
+</AuditFile>
+`;
+}
+
+function descarregar(nome, conteudo, tipo) {
+  const blob = new Blob([conteudo], { type: tipo });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nome;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+const VERSAO_APP = '2026-10-10-v6';
+
+async function exportarLogXML() {
+  await carregarLogs();                         // garante dados actuais (todos os dispositivos, se online)
+  const entradas = filtrarLogs();
+  if (!entradas.length) { showToast('Não há registos para exportar neste período.'); return; }
+  const de = gv('log-de'), ate = gv('log-ate');
+  const xml = construirXMLAuditoria(entradas, { de, ate, user: gv('log-user'), grupo: gv('log-grupo'), docs: document.getElementById('log-incl-docs').checked });
+  registarLog('LOG_EXPORT', 'Registo', 'XML', `${entradas.length} registos · ${de || 'início'} a ${ate || 'hoje'}`);
+  descarregar(`auditoria_${(localStorage.getItem('emp-nuit') || 'empresa').replace(/\W+/g, '')}_${de || 'inicio'}_${ate || 'hoje'}.xml`, xml, 'application/xml;charset=utf-8');
+  showToast('✅ Ficheiro XML de auditoria exportado.');
+}
+
+async function exportarLogCSV() {
+  await carregarLogs();
+  const entradas = filtrarLogs().slice().sort((a, b) => String(a.ts).localeCompare(String(b.ts)));
+  if (!entradas.length) { showToast('Não há registos para exportar neste período.'); return; }
+  const q = t => '"' + String(t == null ? '' : t).replace(/"/g, '""') + '"';
+  const linhas = [['Data/hora (UTC)', 'Utilizador', 'Perfil', 'Operação', 'Código', 'Entidade', 'Referência', 'Detalhe', 'Dispositivo', 'Seq', 'Hash'].join(';')]
+    .concat(entradas.map(e => [e.ts, q(e.user), q(e.role), q(rotuloLog(e.acao)), e.acao, q(e.entidade), q(e.ref), q(e.detalhe), q(e.dev), e.seq, e.hash].join(';')));
+  registarLog('LOG_EXPORT', 'Registo', 'CSV', `${entradas.length} registos`);
+  descarregar(`registo_operacoes_${gv('log-de') || 'inicio'}_${gv('log-ate') || 'hoje'}.csv`, '\ufeff' + linhas.join('\r\n'), 'text/csv;charset=utf-8');
 }
 
 /* ────────── START */
