@@ -1351,7 +1351,7 @@ async function sincronizarTudo(silencioso) {
   if (_numAuto && gv('cot-num') === _numAuto) autoNum();
   const nR = k => Array.isArray(r[k]) ? r[k].length : 0;
   setDbStatus(true, `Ligado. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
-    (r.versao ? ` (script ${r.versao})` : '') + '.');
+    ` · app ${VERSAO_APP}` + (r.versao ? ` · script ${r.versao}` : '') + '.');
   if (!silencioso) showToast('🔄 Sincronização concluída!');
   const ativo = painelActivo();
   if (ativo === 'guardadas') renderCotList();
