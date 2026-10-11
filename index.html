@@ -725,7 +725,7 @@ body.locked{overflow:hidden}
 <script>
 'use strict';
 
-const VERSAO_APP = '2026-10-11-v15';
+const VERSAO_APP = '2026-10-11-v16';
 const _DBC = [104,116,116,112,115,58,47,47,115,99,114,105,112,116,46,103,111,111,103,108,101,46,99,111,109,47,109,97,99,114,111,115,47,115,47,65,75,102,121,99,98,121,89,65,49,118,97,84,90,51,56,77,88,66,107,111,69,121,122,118,80,49,87,87,70,48,75,89,116,83,112,66,97,81,79,105,121,116,104,45,115,71,105,71,52,102,111,49,66,105,102,45,70,71,57,65,65,95,99,81,106,111,112,55,121,65,121,47,101,120,101,99];
 function _dbDef() { return String.fromCharCode.apply(null, _DBC); }
 const _XK = 0x5A;
@@ -1140,6 +1140,7 @@ function aplicarMudancasRemotas(r) {
   }
 
   if (mudou) {
+    refrescarNumAuto();
     const ativo = painelActivo();
     if (ativo === 'guardadas') renderCotList();
     if (ativo === 'produtos') renderProdList();
@@ -1214,6 +1215,7 @@ async function sincronizarTudo() {
       aplicarPermissoes();
     }
     setConnStatus('ok', 'Sincronizado');
+    refrescarNumAuto();
     const ativo = painelActivo();
     if (ativo === 'guardadas') renderCotList();
     if (ativo === 'produtos') renderProdList();
@@ -1305,16 +1307,35 @@ function registarSeq(n) {
   const atual = parseInt(localStorage.getItem('cotSeq') || 0) || 0;
   if (n > atual) { localStorage.setItem('cotSeq', n); if (temDB()) dbCall('saveConfig', { config: { cotSeq: String(n) } }); }
 }
-function autoNum() {
-  const seq = seqMaximo() + 1;
+let _cotEditNum = '';
+function parseNum(num) {
+  const m = String(num || '').match(/^(.*?)(\d+)\/(.*)$/);
+  return m ? { pref: m[1], seq: parseInt(m[2], 10), larg: m[2].length, resto: m[3] } : null;
+}
+function mesmoNumero(a, b) {
+  a = String(a || '').trim(); b = String(b || '').trim();
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const pa = parseNum(a), pb = parseNum(b);
+  return !!(pa && pb && pa.pref === pb.pref && pa.seq === pb.seq);
+}
+function getCots() { try { return JSON.parse(localStorage.getItem('cotacoes') || '[]'); } catch (e) { return []; } }
+function numCotEmUso(num) { return getCots().some(c => mesmoNumero(c.num, num)); }
+function numDocEmUso(tipo, num) { return getDocs().some(d => d.tipo === tipo && mesmoNumero(d.num, num)); }
+function gerarNumCot() {
   const prefix = localStorage.getItem('cfg-prefix') || '';
-  const seqStr = String(seq).padStart(4, '0');
-  const hoje = new Date();
-  const dd = String(hoje.getDate()).padStart(2, '0');
-  const mm = String(hoje.getMonth() + 1).padStart(2, '0');
-  const aaaa = hoje.getFullYear();
-  _numAuto = prefix + seqStr + '/' + dd + mm + aaaa;
+  const h = new Date();
+  const dm = String(h.getDate()).padStart(2, '0') + String(h.getMonth() + 1).padStart(2, '0') + h.getFullYear();
+  let seq = seqMaximo() + 1, num;
+  do { num = prefix + String(seq).padStart(4, '0') + '/' + dm; seq++; } while (numCotEmUso(num));
+  return num;
+}
+function autoNum() {
+  _numAuto = gerarNumCot();
   document.getElementById('cot-num').value = _numAuto;
+}
+function refrescarNumAuto() {
+  if (_numAuto && !_cotEditNum && gv('cot-num') === _numAuto && numCotEmUso(_numAuto)) autoNum();
 }
 
 function switchTab(id) {
@@ -1441,6 +1462,7 @@ function moverItem(id, direcao) {
 function updateItem(id, field, val) {
   const it = items.find(i=>i.id===id);
   if (it) it[field] = val;
+  if (it && (field === 'ref' || field === 'desc')) delete it.prodId;
   const el = document.getElementById('tliq-'+id);
   if (el) el.textContent = fmt(calcLiq(it));
   calcTotals();
@@ -1866,7 +1888,7 @@ function descMovTipo() {
   const t = gv('mov-tipo');
   document.getElementById('mov-qtd-label').textContent = t === 'AJUSTE' ? 'Novo valor de stock' : 'Quantidade';
   const pv = document.getElementById('mov-preview');
-  const p = getProdutos().find(x => x.id === gv('mov-prod-id'));
+  const p = getProdutos().find(x => String(x.id) === String(gv('mov-prod-id')));
   if (!p) { pv.style.display = 'none'; return; }
   const q = parseFloat(gv('mov-qtd')) || 0;
   let depois = 0;
@@ -1880,7 +1902,7 @@ async function confirmarMovStock() {
   const prodId = gv('mov-prod-id');
   if (!prodId) { showToast('⚠️ Escolha o produto.'); return; }
   const prods = getProdutos();
-  const p = prods.find(x => x.id === prodId);
+  const p = prods.find(x => String(x.id) === String(prodId));
   if (!p) { showToast('⚠️ Produto não encontrado.'); return; }
   const tipo = gv('mov-tipo');
   const qtdIn = parseFloat(gv('mov-qtd')) || 0;
@@ -1933,9 +1955,8 @@ function guardarProdutosDaCotacao() {
   items.forEach(it => {
     const ref = String(it.ref == null ? '' : it.ref).trim(), desc = String(it.desc == null ? '' : it.desc).trim();
     if (!ref && !desc) return;
-    const key = (ref + desc).toLowerCase();
-    if (prods.some(p => (String(p.ref || '') + String(p.desc || '')).toLowerCase().trim() === key)) return;
-    const prod = {id: Date.now() + Math.floor(Math.random() * 1000), ref, desc, un:it.un, pu:it.pu, iva:it.iva, stock:0, stockMin:0, rastrear:'sim'};
+    if (acharProduto(prods, it)) return;
+    const prod = {id: Date.now() + Math.floor(Math.random() * 1000), ref, desc, un:it.un, pu:it.pu, iva:it.iva, stock:0, stockMin:0, rastrear:'nao'};
     prods.unshift(prod);
     alterados.push(prod);
   });
@@ -2082,38 +2103,42 @@ function selecionarProduto(prodId) {
   if (!p || !_itemParaSel) return;
   const it = items.find(i=>i.id===_itemParaSel);
   if (!it) return;
-  it.ref=p.ref; it.desc=p.desc; it.un=p.un; it.pu=p.pu; it.iva=p.iva;
+  it.ref=p.ref; it.desc=p.desc; it.un=p.un; it.pu=p.pu; it.iva=p.iva; it.prodId=p.id;
   _itemParaSel = null;
   fecharModal();
   renderItems();
 }
 
 /* ═══════════ VALIDAÇÃO DE STOCK ═══════════ */
+function normTxt(s) { return String(s == null ? '' : s).trim().toLowerCase().replace(/\s+/g, ' '); }
+function acharProduto(prods, it) {
+  if (!it) return null;
+  if (it.prodId != null && it.prodId !== '') {
+    const p = prods.find(x => String(x.id) === String(it.prodId));
+    if (p) return p;
+  }
+  const r = normTxt(it.ref), d = normTxt(it.desc);
+  if (!r && !d) return null;
+  return prods.find(x => normTxt(x.ref) === r && normTxt(x.desc) === d) || null;
+}
 function verificarStockItens(itensArr) {
   const prods = getProdutos();
-  const erros = [];
+  const agg = {};
   (itensArr || []).forEach(it => {
     const qtd = +it.qtd || 0;
     if (qtd <= 0) return;
-    const p = prods.find(x =>
-      String(x.ref || '') === String(it.ref || '') &&
-      String(x.desc || '') === String(it.desc || '')
-    );
-    if (!p) return;
-    if (p.rastrear === 'nao') return;
-    const st = +p.stock || 0;
-    if (st < qtd) {
-      erros.push({
-        ref: p.ref || p.desc || '—',
-        desc: p.desc || '',
-        precisa: qtd,
-        tem: st,
-        falta: round2(qtd - st),
-        un: p.un || 'Un'
-      });
-    }
+    const p = acharProduto(prods, it);
+    if (!p || p.rastrear === 'nao') return;
+    const k = String(p.id);
+    (agg[k] = agg[k] || { p, qtd: 0 }).qtd += qtd;
   });
-  return erros;
+  return Object.keys(agg).map(k => agg[k])
+    .filter(a => round2(a.qtd) > round2(+a.p.stock || 0))
+    .map(a => ({
+      ref: a.p.ref || a.p.desc || '—', desc: a.p.desc || '',
+      precisa: round2(a.qtd), tem: round2(+a.p.stock || 0),
+      falta: round2(a.qtd - (+a.p.stock || 0)), un: a.p.un || 'Un'
+    }));
 }
 function htmlAlertaStock(erros) {
   if (!erros.length) return '';
@@ -2144,55 +2169,84 @@ function validarCotacao() {
   }
   return { erros, avisos };
 }
-function guardarCotacao() {
+let _guardandoCot = false;
+function resolverNumCot() {
   const num = gv('cot-num').trim();
-  if (!num) { showToast('⚠️ Indique o número.'); return; }
+  if (!num) return { num: gerarNumCot(), edit: false, renum: true, original: '' };
+  if (_cotEditNum && _cotEditNum === num && cotGuardada(num)) return { num, edit: true, renum: false, original: num };
+  if (numCotEmUso(num)) return { num: gerarNumCot(), edit: false, renum: true, original: num };
+  return { num, edit: false, renum: false, original: num };
+}
+function guardarCotacao() {
   const v = validarCotacao();
   if (v.erros.length) { alert('Não é possível guardar:\n\n• ' + v.erros.join('\n• ')); return; }
   if (v.avisos.length && !confirm('Atenção:\n\n• ' + v.avisos.join('\n• ') + '\n\nGuardar?')) return;
-  const cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
+  const r = resolverNumCot();
   const info = document.getElementById('guardar-info');
-  info.style.display='none';
-  if (cots.find(c=>c.num===num)) { info.textContent='Já existe cotação com este número. Será substituída.'; info.style.display='block'; }
+  info.style.display = 'none';
+  if (r.edit) { info.textContent = 'A cotação ' + r.num + ' já existe e será actualizada.'; info.style.display = 'block'; }
+  else if (r.renum && r.original) { info.textContent = 'O número ' + r.original + ' já existe. Será atribuído automaticamente o ' + r.num + '.'; info.style.display = 'block'; }
   document.getElementById('modal-guardar').classList.add('open');
 }
-function confirmarGuardar() {
-  const num = gv('cot-num').trim();
-  const t = calcTotaisComDesconto();
-  const cot = {
-    num, data:gv('cot-data'), venc:gv('cot-venc'), validade:gv('cot-validade'),
-    moeda:gv('cot-moeda'), cond:gv('cot-cond'), tempo:gv('cot-tempo'), obs:gv('cot-obs'),
-    cliNome:gv('cli-nome'), cliNuit:gv('cli-nuit'), cliEnd:gv('cli-end'),
-    cliCidade:gv('cli-cidade'), cliTel:gv('cli-tel'), cliEmail:gv('cli-email'),
-    items:JSON.parse(JSON.stringify(items)),
-    sub:t.sub, descTipo:t.descTipo, descValor:t.descValor, desconto:t.desconto,
-    iva:t.iva, total:t.total,
-    savedAt:new Date().toISOString()
-  };
-  let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
-  const idx = cots.findIndex(c=>c.num===num);
-  const anterior = idx>=0 ? cots[idx] : null;
-  const agoraISO = new Date().toISOString();
-  cot.uid = (anterior && anterior.uid) || novoUid();
-  cot.criadoEm = (anterior && (anterior.criadoEm || anterior.savedAt)) || agoraISO;
-  cot.savedAt = cot.criadoEm;
-  cot.modificadoEm = agoraISO;
-  cot.impressoes = ((anterior && anterior.impressoes) || 0) + (anterior ? 0 : _impressoesForm);
-  cot.criadoPor = (anterior && anterior.criadoPor) || (SESSAO && SESSAO.username) || '';
-  cot.modificadoPor = (SESSAO && SESSAO.username) || '';
-  if (idx>=0) cots[idx]=cot; else cots.unshift(cot);
+function reconciliarNumCot(velho, novo) {
+  const cots = getCots();
+  const c = cots.find(x => x.num === velho);
+  if (!c) return;
+  c.num = novo;
   localStorage.setItem('cotacoes', JSON.stringify(cots));
-  registarSeq(seqDeNum(num));
-  if (pode('produtos')) guardarProdutosDaCotacao();
-  if (cot.cliNome && cot.cliNome.trim()) registarClienteAuto(cot);
-  registarLog(anterior ? 'COT_EDITAR' : 'COT_CRIAR', 'Cotação', num, `Cliente: ${cot.cliNome || '—'} · Total ${fmt(cot.total)} ${cot.moeda}`);
-  fecharModal();
-  showToast('Cotação '+num+' guardada!');
-  if (temDB()) {
-    dbCall('saveCotacao', { cotacao: cot }).then(r => {
-      if (r && r.ok) setTimeout(sincronizarTudo, 500);
-    });
-  }
+  registarSeq(seqDeNum(novo));
+  if (gv('cot-num').trim() === velho) document.getElementById('cot-num').value = novo;
+  if (_cotEditNum === velho) _cotEditNum = novo;
+  registarLog('SYS_RENUMERADA', 'Cotação', novo, 'Renumerada pelo servidor: ' + velho + ' → ' + novo);
+  showToast('O nº ' + velho + ' já existia noutro dispositivo. Atribuído ' + novo + '.');
+  if (painelActivo() === 'guardadas') renderCotList();
+}
+async function confirmarGuardar() {
+  if (_guardandoCot) return;
+  _guardandoCot = true;
+  try {
+    const r = resolverNumCot();
+    const num = r.num;
+    document.getElementById('cot-num').value = num;
+    const t = calcTotaisComDesconto();
+    const cot = {
+      num, data:gv('cot-data'), venc:gv('cot-venc'), validade:gv('cot-validade'),
+      moeda:gv('cot-moeda'), cond:gv('cot-cond'), tempo:gv('cot-tempo'), obs:gv('cot-obs'),
+      cliNome:gv('cli-nome'), cliNuit:gv('cli-nuit'), cliEnd:gv('cli-end'),
+      cliCidade:gv('cli-cidade'), cliTel:gv('cli-tel'), cliEmail:gv('cli-email'),
+      items:JSON.parse(JSON.stringify(items)),
+      sub:t.sub, descTipo:t.descTipo, descValor:t.descValor, desconto:t.desconto,
+      iva:t.iva, total:t.total,
+      savedAt:new Date().toISOString()
+    };
+    const cots = getCots();
+    const idx = r.edit ? cots.findIndex(c => c.num === num) : -1;
+    const anterior = idx >= 0 ? cots[idx] : null;
+    const agoraISO = new Date().toISOString();
+    cot.uid = (anterior && anterior.uid) || novoUid();
+    cot.criadoEm = (anterior && (anterior.criadoEm || anterior.savedAt)) || agoraISO;
+    cot.savedAt = cot.criadoEm;
+    cot.modificadoEm = agoraISO;
+    cot.impressoes = ((anterior && anterior.impressoes) || 0) + (anterior ? 0 : _impressoesForm);
+    cot.criadoPor = (anterior && anterior.criadoPor) || (SESSAO && SESSAO.username) || '';
+    cot.modificadoPor = (SESSAO && SESSAO.username) || '';
+    if (idx >= 0) cots[idx] = cot; else cots.unshift(cot);
+    localStorage.setItem('cotacoes', JSON.stringify(cots));
+    _cotEditNum = num;
+    registarSeq(seqDeNum(num));
+    if (pode('produtos')) guardarProdutosDaCotacao();
+    if (cot.cliNome && cot.cliNome.trim()) registarClienteAuto(cot);
+    registarLog(anterior ? 'COT_EDITAR' : 'COT_CRIAR', 'Cotação', num, `Cliente: ${cot.cliNome || '—'} · Total ${fmt(cot.total)} ${cot.moeda}`);
+    fecharModal();
+    showToast(r.renum && r.original ? 'O nº ' + r.original + ' já existia. Guardada como ' + num + '.' : 'Cotação ' + num + ' guardada!');
+    if (temDB()) {
+      const resp = await dbCall('saveCotacao', { cotacao: cot });
+      if (resp && resp.ok) {
+        if (resp.renumerado && resp.cotacao && resp.cotacao.num !== num) reconciliarNumCot(num, resp.cotacao.num);
+        setTimeout(sincronizarTudo, 500);
+      } else if (!resp) showToast('⚠️ Sem ligação: cotação guardada só neste dispositivo.');
+    }
+  } finally { _guardandoCot = false; }
 }
 function renderCotList() {
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
@@ -2227,6 +2281,7 @@ function carregarCotacao(num) {
     const el = document.getElementById('cli-'+f);
     if(el) el.value = c['cli'+f.charAt(0).toUpperCase()+f.slice(1)] || '';
   });
+  _cotEditNum = c.num;
   items = c.items.map(it=>({...it}));
   itemIdx = Math.max(...items.map(i=>i.id), 0);
   renderItems();
@@ -2294,13 +2349,49 @@ function cotacaoDoForm() {
 function getDocs() { try { return JSON.parse(localStorage.getItem('documentos') || '[]'); } catch (e) { return []; } }
 function setDocs(a) { localStorage.setItem('documentos', JSON.stringify(a)); }
 function docId(tipo, num) { return tipo + ':' + num; }
-function guardarDoc(doc, movs) {
+async function guardarDoc(doc, movs) {
   doc.atualizadoEm = new Date().toISOString();
   const docs = getDocs();
   const i = docs.findIndex(x => x.id === doc.id);
   if (i >= 0) docs[i] = doc; else docs.unshift(doc);
   setDocs(docs);
-  if (temDB()) dbCall('saveDocumento', { documento: doc, movimentos: movs || [] });
+  if (!temDB()) return doc;
+  const r = await dbCall('saveDocumento', { documento: doc, movimentos: movs || [] });
+  if (!r) { showToast('⚠️ Sem ligação: guardado só neste dispositivo.'); return doc; }
+  if (r.ok) {
+    if (r.renumerado && r.documento && r.documento.id !== doc.id) reconciliarNumDoc(doc, r.documento);
+    if (Array.isArray(r.produtos) && r.produtos.length) mesclarProdutosServidor(r.produtos);
+  } else if (r.error && r.code !== 'AUTH') showToast('⚠️ ' + r.error);
+  return doc;
+}
+function reconciliarNumDoc(velho, novo) {
+  const docs = getDocs();
+  const i = docs.findIndex(x => x.id === velho.id);
+  if (i >= 0) { docs[i].id = novo.id; docs[i].num = novo.num; setDocs(docs); }
+  const ms = getMovs();
+  let mudou = false;
+  ms.forEach(m => {
+    if (m.refDoc === velho.id) { m.refDoc = novo.id; if (m.tipo === 'VENDA') m.motivo = novo.tipo + ' ' + novo.num; mudou = true; }
+  });
+  if (mudou) setMovs(ms);
+  registarSeqDoc(novo.tipo, seqDeNum(novo.num));
+  registarLog('SYS_RENUMERADA', TIPOS_DOC[novo.tipo].nome, novo.num, 'Renumerado pelo servidor: ' + velho.num + ' → ' + novo.num);
+  showToast('O nº ' + velho.num + ' já existia noutro dispositivo. Atribuído ' + novo.num + '.');
+  if (painelActivo() === 'documentos') renderDocList();
+}
+function mesclarProdutosServidor(lista) {
+  const loc = getProdutos();
+  lista.forEach(s => {
+    const n = Object.assign({}, s, {
+      id: normId(s.id), ref: String(s.ref == null ? '' : s.ref), desc: String(s.desc == null ? '' : s.desc),
+      un: s.un || 'Un', pu: +s.pu || 0, iva: +s.iva || 0, stock: +s.stock || 0, stockMin: +s.stockMin || 0,
+      rastrear: s.rastrear !== 'nao' ? 'sim' : 'nao'
+    });
+    const i = loc.findIndex(p => String(p.id) === String(s.id));
+    if (i >= 0) loc[i] = n; else loc.unshift(n);
+  });
+  setProdutos(loc);
+  if (painelActivo() === 'produtos') renderProdList();
 }
 function normDoc(x) {
   const o = Object.assign({}, x);
@@ -2331,8 +2422,10 @@ function registarSeqDoc(tipo, n) {
 }
 function proximoNumDoc(tipo) {
   const h = new Date();
-  const dd = String(h.getDate()).padStart(2, '0'), mm = String(h.getMonth() + 1).padStart(2, '0');
-  return prefixoDoc(tipo) + String(seqMaximoDoc(tipo) + 1).padStart(4, '0') + '/' + dd + mm + h.getFullYear();
+  const dm = String(h.getDate()).padStart(2, '0') + String(h.getMonth() + 1).padStart(2, '0') + h.getFullYear();
+  let seq = seqMaximoDoc(tipo) + 1, num;
+  do { num = prefixoDoc(tipo) + String(seq).padStart(4, '0') + '/' + dm; seq++; } while (numDocEmUso(tipo, num));
+  return num;
 }
 function pagosPorFactura() {
   const m = {};
@@ -2368,7 +2461,7 @@ function abrirEmitir(tipo, ref) {
     cot = cotacaoDoForm();
     if (!cot.items.some(it => String(it.desc || '').trim() && calcLiq(it) > 0)) { showToast('⚠️ Adicione itens válidos.'); return; }
     const guardada = JSON.parse(localStorage.getItem('cotacoes') || '[]').find(c => c.num === cot.num);
-    cot.origem = guardada ? cot.num : '';
+    cot.origem = (guardada && _cotEditNum === cot.num) ? cot.num : '';
   } else {
     const c = JSON.parse(localStorage.getItem('cotacoes') || '[]').find(x => x.num === ref);
     if (!c) { showToast('⚠️ Cotação não encontrada.'); return; }
@@ -2403,12 +2496,18 @@ function abrirEmitir(tipo, ref) {
 function confirmarEmitir() {
   if (!_emitir) return;
   const { tipo, cot } = _emitir;
-  const num = gv('em-num').trim();
-  if (!num) { showToast('⚠️ Indique o número.'); return; }
-  const id = docId(tipo, num);
-  if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe documento com este número.'); return; }
 
-  // Verificar stock NOVAMENTE
+  // Protecção de numeração: se o número está vazio ou já existe, usa o seguinte
+  let num = gv('em-num').trim();
+  let aviso = '';
+  if (!num || numDocEmUso(tipo, num)) {
+    const original = num;
+    num = proximoNumDoc(tipo);
+    document.getElementById('em-num').value = num;
+    if (original) aviso = 'O nº ' + original + ' já existia. Atribuído ' + num + '. ';
+  }
+  const id = docId(tipo, num);
+
   const errosStock = verificarStockItens(cot.items);
   if (errosStock.length) {
     document.getElementById('em-stock-alerta').innerHTML = htmlAlertaStock(errosStock);
@@ -2433,42 +2532,38 @@ function confirmarEmitir() {
     uid: novoUid(), impressoes: 0
   });
 
-  // ═══ ABATE DE STOCK LOCAL (imediato e fiável) ═══
+  // Abate de stock (um movimento por produto, somando linhas repetidas)
   const movsStock = [];
   const prods = getProdutos();
-  let algumAbatido = false;
-
+  const consumo = {};
   (doc.items || []).forEach(it => {
-    const qtd = +it.qtd || 0;
-    if (qtd <= 0) return;
-    const p = prods.find(x =>
-      String(x.ref || '') === String(it.ref || '') &&
-      String(x.desc || '') === String(it.desc || '')
-    );
-    if (!p) return;
-    if (p.rastrear === 'nao') return;
-    const antes = +p.stock || 0;
-    const depois = round2(antes - qtd);
+    const q = +it.qtd || 0;
+    if (q <= 0) return;
+    const p = acharProduto(prods, it);
+    if (!p || p.rastrear === 'nao') return;
+    const k = String(p.id);
+    (consumo[k] = consumo[k] || { p, q: 0 }).q += q;
+  });
+  Object.keys(consumo).forEach(k => {
+    const p = consumo[k].p, q = round2(consumo[k].q);
+    const antes = +p.stock || 0, depois = round2(antes - q);
     p.stock = depois;
     p.stockAtualizadoEm = new Date().toISOString();
-    algumAbatido = true;
     movsStock.push({
       id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
       produtoId: p.id, produtoRef: p.ref || '', produtoDesc: p.desc || '',
-      tipo: 'VENDA', qtd: -qtd, qtdAntes: antes, qtdDepois: depois,
+      tipo: 'VENDA', qtd: -q, qtdAntes: antes, qtdDepois: depois,
       motivo: `${doc.tipo} ${doc.num}`, refDoc: doc.id, obs: '', origem: 'app'
     });
-    registarLog('STOCK_VENDA', 'Produto', p.ref || p.desc || '—', `-${qtd} · ${antes} → ${depois} · ${doc.tipo} ${doc.num}`);
+    registarLog('STOCK_VENDA', 'Produto', p.ref || p.desc || '—', `-${q} · ${antes} → ${depois} · ${doc.tipo} ${doc.num}`);
   });
-
+  const algumAbatido = movsStock.length > 0;
   if (algumAbatido) {
     setProdutos(prods);
-    const ms = getMovs();
-    setMovs(movsStock.concat(ms));
+    setMovs(movsStock.concat(getMovs()));
   }
 
-  // Guardar documento (local + servidor)
-  guardarDoc(doc, movsStock);
+  guardarDoc(doc, movsStock).then(() => setTimeout(sincronizarTudo, 300));
 
   if (tipo === 'FT' && doc.cliNome && doc.cliNome.trim()) registarClienteAuto(doc);
   registarLog('DOC_EMITIR', TIPOS_DOC[tipo].nome, num, `Cliente: ${doc.cliNome || '—'} · Total ${fmt(doc.total)} ${doc.moeda}${algumAbatido ? ' · stock abatido' : ''}`);
@@ -2476,11 +2571,9 @@ function confirmarEmitir() {
 
   fecharModal();
   _emitir = null;
-  showToast(`${TIPOS_DOC[tipo].nome} ${num} emitida.${algumAbatido ? ' Stock actualizado.' : ''}`);
+  showToast(`${aviso}${TIPOS_DOC[tipo].nome} ${num} emitida.${algumAbatido ? ' Stock actualizado.' : ''}`);
   escolherTipoDoc('COT');
   switchTab('documentos');
-
-  setTimeout(sincronizarTudo, 500);
 }
 let _reciboDe = null;
 function abrirRecibo(idEnc) {
@@ -2499,10 +2592,15 @@ function abrirRecibo(idEnc) {
 }
 function confirmarRecibo() {
   const f = _reciboDe; if (!f) return;
-  const num = gv('rc-num').trim();
-  if (!num) { showToast('⚠️ Indique o número.'); return; }
+  let num = gv('rc-num').trim();
+  let aviso = '';
+  if (!num || numDocEmUso('RC', num)) {
+    const original = num;
+    num = proximoNumDoc('RC');
+    document.getElementById('rc-num').value = num;
+    if (original) aviso = 'O nº ' + original + ' já existia. Atribuído ' + num + '. ';
+  }
   const id = docId('RC', num);
-  if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe recibo com este número.'); return; }
   const inf = infoDoc(getDocs().find(x => x.id === f.id) || f, pagosPorFactura());
   const valor = round2(parseFloat(gv('rc-valor')));
   if (!(valor > 0)) { showToast('⚠️ Indique o valor.'); return; }
@@ -2514,15 +2612,14 @@ function confirmarRecibo() {
     items: [], sub: 0, descTipo: 'pct', descValor: 0, desconto: 0, iva: 0, total: valor, valorRecebido: valor,
     facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
-  guardarDoc(doc);
+  guardarDoc(doc).then(() => setTimeout(sincronizarTudo, 300));
   registarLog('DOC_RECIBO', 'Recibo', num, `Factura ${f.num} · Recebido ${fmt(valor)} ${f.moeda}`);
   registarSeqDoc('RC', seqDeNum(num));
   fecharModal();
   _reciboDe = null;
-  showToast(`Recibo ${num} emitido.`);
+  showToast(`${aviso}Recibo ${num} emitido.`);
   escolherTipoDoc('COT');
   renderDocList();
-  setTimeout(sincronizarTudo, 500);
 }
 function previewDoc(idEnc) {
   const d = getDocs().find(x => x.id === decodeURIComponent(idEnc));
@@ -2539,45 +2636,37 @@ function anularDoc(idEnc) {
   if (!confirm(`Anular ${TIPOS_DOC[d.tipo].nome} ${d.num}?`)) return;
   d.estado = 'Anulado'; d.anuladoEm = new Date().toISOString();
 
-  // ═══ REPOR STOCK LOCAL ═══
+  // Repõe exactamente o que foi abatido na emissão (com base nos movimentos VENDA do documento)
   const movsStock = [];
-  let algumReposto = false;
   if (d.tipo === 'FT' || d.tipo === 'VD') {
-    const prods = getProdutos();
-    (d.items || []).forEach(it => {
-      const qtd = +it.qtd || 0;
-      if (qtd <= 0) return;
-      const p = prods.find(x =>
-        String(x.ref || '') === String(it.ref || '') &&
-        String(x.desc || '') === String(it.desc || '')
-      );
-      if (!p) return;
-      if (p.rastrear === 'nao') return;
-      const antes = +p.stock || 0;
-      const depois = round2(antes + qtd);
-      p.stock = depois;
-      p.stockAtualizadoEm = new Date().toISOString();
-      algumReposto = true;
-      movsStock.push({
-        id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
-        produtoId: p.id, produtoRef: p.ref || '', produtoDesc: p.desc || '',
-        tipo: 'ANULACAO', qtd: qtd, qtdAntes: antes, qtdDepois: depois,
-        motivo: 'Anulação ' + d.tipo + ' ' + d.num, refDoc: d.id, obs: '', origem: 'app'
+    const todos = getMovs();
+    const vendas = todos.filter(m => m.refDoc === d.id && m.tipo === 'VENDA');
+    const jaRepostos = todos.some(m => m.refDoc === d.id && m.tipo === 'ANULACAO');
+    if (vendas.length && !jaRepostos) {
+      const prods = getProdutos();
+      vendas.forEach(m => {
+        const p = prods.find(x => String(x.id) === String(m.produtoId));
+        const q = -(+m.qtd || 0);
+        if (!p || p.rastrear === 'nao' || q <= 0) return;
+        const antes = +p.stock || 0, depois = round2(antes + q);
+        p.stock = depois;
+        p.stockAtualizadoEm = new Date().toISOString();
+        movsStock.push({
+          id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
+          produtoId: p.id, produtoRef: p.ref || '', produtoDesc: p.desc || '',
+          tipo: 'ANULACAO', qtd: q, qtdAntes: antes, qtdDepois: depois,
+          motivo: 'Anulação ' + d.tipo + ' ' + d.num, refDoc: d.id, obs: '', origem: 'app'
+        });
+        registarLog('STOCK_ANULACAO', 'Produto', p.ref || p.desc || '—', `+${q} · ${antes} → ${depois} · ${d.tipo} ${d.num}`);
       });
-      registarLog('STOCK_ANULACAO', 'Produto', p.ref || p.desc || '—', `+${qtd} · ${antes} → ${depois} · ${d.tipo} ${d.num}`);
-    });
-    if (algumReposto) {
-      setProdutos(prods);
-      const ms = getMovs();
-      setMovs(movsStock.concat(ms));
+      if (movsStock.length) { setProdutos(prods); setMovs(movsStock.concat(todos)); }
     }
   }
-
-  guardarDoc(d, movsStock);
-  registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, 'Total ' + fmt(d.total) + (algumReposto ? ' · stock reposto' : ''));
+  const reposto = movsStock.length > 0;
+  guardarDoc(d, movsStock).then(() => setTimeout(sincronizarTudo, 300));
+  registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, 'Total ' + fmt(d.total) + (reposto ? ' · stock reposto' : ''));
   renderDocList();
-  showToast('Documento anulado.' + (algumReposto ? ' Stock reposto.' : ''));
-  setTimeout(sincronizarTudo, 500);
+  showToast('Documento anulado.' + (reposto ? ' Stock reposto.' : ''));
 }
 function renderDocList() {
   const wrap = document.getElementById('doc-list-wrap');
@@ -2869,6 +2958,7 @@ function registarImpressao(d) {
 }
 function limparFormSilencioso() {
   _impressoesForm = 0;
+  _cotEditNum = '';
   items=[]; itemIdx=0;
   ['cli-nome','cli-nuit','cli-end','cli-cidade','cli-tel','cli-email'].forEach(f=>{ const el=document.getElementById(f); if(el) el.value=''; });
   document.getElementById('cot-cond').value='Pronto Pagamento';
