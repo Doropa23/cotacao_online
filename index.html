@@ -448,6 +448,25 @@ body.locked{overflow:hidden}
     <div id="log-info" style="font-size:12px;color:var(--muted);margin-bottom:8px"></div>
     <div id="log-integridade" style="display:none;font-size:12px;margin-bottom:8px"></div>
     <div id="log-list" class="res-wrap"></div>
+
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">📦 Arquivo de registos antigos</div>
+      <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:10px">
+        Move os registos antigos para um <strong>ficheiro Google Sheets separado</strong> (criado no seu Drive), para a folha “Logs” não crescer sem fim.
+        Nada se perde: só saem da folha principal depois de copiados e conferidos. Só se arquivam registos com <strong>mais de 30 dias</strong>.
+        Os registos arquivados deixam de aparecer aqui e no XML — para os consultar abra o ficheiro de arquivo.
+      </p>
+      <div class="doc-filtros">
+        <div class="field"><label>Arquivar registos anteriores a</label><input type="date" id="arq-data"></div>
+        <div class="field"><label>&nbsp;</label><div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="simularArquivo()">🔎 Simular</button>
+          <button class="btn btn-primary btn-sm" onclick="arquivarLogsAgora()">📦 Arquivar agora</button>
+          <button class="btn btn-secondary btn-sm" onclick="carregarArquivos()">🔄 Lista</button>
+        </div></div>
+      </div>
+      <div id="arq-estado" style="font-size:12px;margin-bottom:8px"></div>
+      <div id="arq-lista" class="res-wrap"></div>
+    </div>
   </div>
 
   <div class="card" data-perm="db">
@@ -1523,7 +1542,7 @@ function switchTab(id) {
   if (id==='resumos') iniciarResumos();
   if (id==='produtos') renderProdList();
   if (id==='config' && pode('utilizadores')) carregarUsuarios();
-  if (id==='config' && pode('db')) carregarLogs();
+  if (id==='config' && pode('db')) { carregarLogs(); carregarArquivos(); }
 }
 
 /* ────────── PROTECÇÃO POR PIN (separador Configurações) */
@@ -3381,7 +3400,7 @@ function renderLogs(mais) {
   _logsVista = filtrarLogs();
   const pend = getLogs().filter(e => !e.env).length;
   document.getElementById('log-info').textContent =
-    `${_logsVista.length} registo(s) no período · origem: ${_logsOrigem === 'servidor' ? 'Base de Dados (todos os dispositivos)' : 'apenas este dispositivo (sem ligação)'}` + (pend ? ` · ${pend} por enviar` : '');
+    `${_logsVista.length} registo(s) no período · origem: ${_logsOrigem === 'servidor' ? 'Base de Dados (todos os dispositivos)' : 'apenas este dispositivo (sem ligação)'}` + (pend ? ` · ${pend} por enviar` : '') + (_nArquivos ? ` · ${_nArquivos} ficheiro(s) de arquivo com registos antigos` : '');
   if (!_logsVista.length) { wrap.innerHTML = '<p style="font-size:12px;color:var(--muted)">Sem registos para os filtros escolhidos.</p>'; return; }
   const cor = { AUTH: 'tag-FT', COT: 'tag-FT', DOC: 'tag-VD', IMPRESSAO: 'tag-RC', CAD: 'tag-RC', CFG: 'tag-VD', USR: 'tag-VD', SYS: 'st-Anulado' };
   const linhas = _logsVista.slice(0, _logMostrar).map(e => `<tr>
@@ -3393,6 +3412,58 @@ function renderLogs(mais) {
     <td title="${esc(e.dev)}">${e.env ? '✔' : '⏳'}</td></tr>`).join('');
   wrap.innerHTML = `<table class="res-table"><thead><tr><th>Data/hora</th><th>Utilizador</th><th>Perfil</th><th>Operação</th><th>Entidade</th><th>Referência</th><th>Detalhe</th><th></th></tr></thead><tbody>${linhas}</tbody></table>` +
     (_logsVista.length > _logMostrar ? `<div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="renderLogs(true)">Mostrar mais (${_logsVista.length - _logMostrar})</button></div>` : '');
+}
+
+/* ────────── Arquivo de registos antigos (Configurações → Registo de Operações) */
+let _nArquivos = 0;
+function arqDataPadrao() {
+  const d = new Date(); d.setDate(d.getDate() - 365);
+  return dataLocalISO(d);
+}
+function arqErro(r) { return (r && r.error) ? r.error : 'Sem ligação à Base de Dados (ou o Code.gs ainda não está actualizado).'; }
+
+async function simularArquivo() {
+  const est = document.getElementById('arq-estado'), data = gv('arq-data');
+  if (!data) { est.textContent = 'Escolha a data limite.'; return; }
+  est.textContent = 'A calcular...';
+  const r = await dbCallRaw('archiveLogs', { antesDe: data, simular: true });
+  est.innerHTML = (r && r.ok)
+    ? `🔎 Simulação: <strong>${r.candidatos}</strong> registo(s) anteriores a ${esc(fmtDate(data))} (de ${r.totalNaFolha} na folha). Nada foi alterado.`
+    : '⚠️ ' + esc(arqErro(r));
+}
+
+async function arquivarLogsAgora() {
+  const est = document.getElementById('arq-estado'), data = gv('arq-data');
+  if (!data) { est.textContent = 'Escolha a data limite.'; return; }
+  if (!confirm(`Arquivar todos os registos anteriores a ${fmtDate(data)}?\n\nSão copiados para um novo ficheiro Google Sheets no seu Drive e removidos da folha "Logs". Esta operação pode demorar alguns minutos.`)) return;
+  let total = 0, ultimo = null;
+  for (let ronda = 0; ronda < 10; ronda++) {
+    est.textContent = ronda ? `A arquivar... ${total} registos já movidos` : 'A arquivar... (pode demorar)';
+    const r = await dbCallRaw('archiveLogs', { antesDe: data });
+    if (!r || !r.ok) { est.innerHTML = '⚠️ ' + esc(arqErro(r)) + (total ? ` (já movidos: ${total})` : ''); break; }
+    total += r.arquivadas; ultimo = r;
+    if (!r.restantes || !r.arquivadas) break;
+  }
+  if (ultimo && ultimo.ok) {
+    est.innerHTML = total ? `✅ ${total} registo(s) arquivado(s).` + (ultimo.restantes ? ` Ainda restam ${ultimo.restantes}; carregue novamente em “Arquivar agora”.` : '') : 'Não há registos para arquivar até essa data.';
+  }
+  carregarArquivos(); carregarLogs();
+}
+
+async function carregarArquivos() {
+  const wrap = document.getElementById('arq-lista');
+  if (!wrap) return;
+  if (!gv('arq-data')) document.getElementById('arq-data').value = arqDataPadrao();
+  if (!(temDB() && SESSAO && SESSAO.token && _online)) { wrap.innerHTML = ''; return; }
+  const r = await dbCallRaw('listArchives', {});
+  if (!r || !r.ok || !Array.isArray(r.arquivos)) { wrap.innerHTML = ''; return; }
+  _nArquivos = r.arquivos.length;
+  wrap.innerHTML = r.arquivos.length ? `<table class="res-table"><thead><tr><th>Ficheiro de arquivo</th><th>De</th><th>Até</th><th class="r">Registos</th><th>Criado em</th><th></th></tr></thead><tbody>` +
+    r.arquivos.map(a => `<tr><td>${esc(a.nome)}</td><td>${esc(fmtDate(a.de))}</td><td>${esc(fmtDate(a.ate))}</td><td class="r">${+a.linhas || 0}</td>
+      <td>${esc(String(a.criadoEm).slice(0, 10))}</td>
+      <td>${/^https:\/\/docs\.google\.com\//.test(a.url || '') ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">Abrir ↗</a>` : ''}</td></tr>`).join('') + '</tbody></table>'
+    : '<p style="font-size:12px;color:var(--muted)">Ainda não há ficheiros de arquivo.</p>';
+  renderLogs(null);
 }
 
 /* ────────── Integridade (cadeia de hashes) */
