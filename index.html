@@ -112,11 +112,6 @@ textarea{resize:vertical;min-height:58px}
 .doc-card.anulado{opacity:.55}
 .doc-card.anulado .cot-card-total{text-decoration:line-through}
 [hidden]{display:none!important}
-#offline-banner{background:#b45309;color:#fff;text-align:center;padding:6px 12px;font-size:12px;font-weight:600;position:sticky;top:0;z-index:900;display:flex;align-items:center;justify-content:center;gap:6px}
-#offline-bloqueio{position:fixed;inset:0;background:rgba(15,20,40,.96);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px}
-#offline-bloqueio .box{background:#fff;border-radius:12px;max-width:460px;padding:26px 28px;text-align:center}
-#offline-bloqueio h2{font-size:18px;margin-bottom:10px;color:#b3261e}
-#offline-bloqueio p{font-size:13px;line-height:1.6;color:#333;margin-bottom:10px}
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .kpi{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:12px 14px;box-shadow:var(--shadow)}
 .kpi .k-l{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
@@ -133,9 +128,11 @@ textarea{resize:vertical;min-height:58px}
 @media(max-width:800px){.kpi-grid{grid-template-columns:1fr 1fr}}
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;align-items:center;justify-content:center}
 .modal-bg.open{display:flex}
-.modal{background:#fff;border-radius:12px;padding:24px;width:92%;max-width:560px;box-shadow:0 8px 32px rgba(0,0,0,.18);max-height:90vh;overflow-y:auto}
-.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text);display:flex;align-items:center;gap:8px}
+.modal{background:#fff;border-radius:12px;padding:24px;width:92%;max-width:560px;box-shadow:0 8px 32px rgba(0,0,0,.18);max-height:90vh;overflow-y:auto;position:relative}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:14px;color:var(--text);display:flex;align-items:center;gap:8px;padding-right:30px}
 .modal .btn-bar{margin-top:16px}
+.modal-close{position:absolute;top:14px;right:14px;background:none;border:none;cursor:pointer;font-size:22px;color:var(--muted);padding:2px 10px;border-radius:6px;line-height:1;transition:all .15s;z-index:10;font-weight:400}
+.modal-close:hover{background:#f3f4f6;color:var(--red)}
 #login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#0f2c5c,#1a4fa0);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px}
 #login-screen.hidden{display:none}
 .login-box{background:#fff;border-radius:14px;padding:36px 32px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.35)}
@@ -181,20 +178,13 @@ body.locked{overflow:hidden}
 .cli-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:14px}
 .cli-actions{display:flex;flex-direction:column;gap:4px}
 .icon-inline{display:inline-flex;align-items:center;gap:6px}
+#conn-status{position:fixed;bottom:12px;left:12px;background:#fff;border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;box-shadow:var(--shadow);z-index:500;display:flex;align-items:center;gap:6px;opacity:.85}
+#conn-status .dot{width:8px;height:8px;border-radius:50%;background:#ccc}
+#conn-status.ok .dot{background:#0d6e3f}
+#conn-status.err .dot{background:#c0392b}
 </style>
 </head>
 <body class="locked">
-
-<div id="offline-banner" hidden></div>
-<div id="offline-bloqueio" hidden>
-  <div class="box">
-    <h2 id="ob-titulo">Aplicação bloqueada</h2>
-    <p id="ob-msg"></p>
-    <p style="font-size:12px;color:#666">Os seus dados continuam guardados neste dispositivo. Ligue-se à internet e carregue no botão para sincronizar e continuar.</p>
-    <button class="btn btn-primary" id="ob-btn" onclick="tentarReligar()">Tentar ligar agora</button>
-    <div id="ob-estado" style="font-size:12px;margin-top:10px;color:#666"></div>
-  </div>
-</div>
 
 <div id="login-screen">
   <div class="login-box">
@@ -216,6 +206,8 @@ body.locked{overflow:hidden}
   </div>
 </div>
 
+<div id="conn-status" title="Estado da ligação"><span class="dot"></span><span id="conn-txt">...</span></div>
+
 <div class="tabs no-print">
   <div class="tab active" data-tab="cotacao" hidden onclick="irParaNovoDocumento()" data-icon="novo"><span>Novo Documento</span></div>
   <div class="tab" data-tab="guardadas" hidden onclick="switchTab('guardadas')" data-icon="guardadas"><span>Cotações</span></div>
@@ -224,7 +216,7 @@ body.locked{overflow:hidden}
   <div class="tab" data-tab="produtos" hidden onclick="switchTab('produtos')" data-icon="produtos"><span>Produtos</span></div>
   <div class="tab" data-tab="resumos" hidden onclick="switchTab('resumos')" data-icon="resumos"><span>Resumos</span></div>
   <div class="tab" data-tab="preview" hidden onclick="switchTab('preview')" data-icon="eye"><span>Pré-visualizar</span></div>
-  <div class="tab" data-tab="config" hidden onclick="abrirConfigComPin()" data-icon="config"><span>Configurações</span></div>
+  <div class="tab" data-tab="config" hidden onclick="switchTab('config')" data-icon="config"><span>Configurações</span></div>
   <div class="tab" id="user-chip" onclick="abrirMinhaConta()" title="A minha conta" style="margin-left:auto;flex:0;white-space:nowrap"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="user-chip-txt"></span></div>
   <div class="tab" onclick="terminarSessao()" style="flex:0"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sair</span></div>
 </div>
@@ -325,7 +317,7 @@ body.locked{overflow:hidden}
       <div class="extenso-box" id="t-extenso">—</div>
     </div>
     <div class="btn-bar">
-      <button class="btn btn-primary" onclick="switchTab('preview');gerarPreview()">Pré-visualizar</button>
+      <button class="btn btn-primary" onclick="switchTab('preview')">Pré-visualizar</button>
       <button class="btn btn-success" onclick="exportarPDF()">Exportar PDF</button>
       <button class="btn btn-secondary" onclick="guardarCotacao()">Guardar Cotação</button>
       <button class="btn btn-warning" data-perm="emitir" onclick="abrirEmitir('FT','__form__')">Gerar Factura</button>
@@ -381,7 +373,7 @@ body.locked{overflow:hidden}
     <h2 style="font-size:16px;font-weight:700">Carteira de Clientes</h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="abrirClienteModal()">Novo Cliente</button>
-      <button class="btn btn-secondary btn-sm" onclick="carregarClientes()">Actualizar</button>
+      <button class="btn btn-secondary btn-sm" onclick="renderClientes()">Actualizar</button>
     </div>
   </div>
   <div class="doc-filtros">
@@ -569,11 +561,16 @@ body.locked{overflow:hidden}
 </div>
 
 <!-- MODAIS -->
-<div class="modal-bg" id="modal-clientes"><div class="modal"><h3>Seleccionar Cliente</h3>
+<div class="modal-bg" id="modal-clientes"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
+  <h3>Seleccionar Cliente</h3>
   <input class="modal-search" id="search-cli" placeholder="Pesquisar cliente..." oninput="renderModalClientes()">
-  <div id="modal-cli-list"></div><div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div></div></div>
+  <div id="modal-cli-list"></div>
+  <div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-cliente-edit"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3 id="cli-titulo">Novo Cliente</h3><input type="hidden" id="cli-edit-id">
   <div class="form-grid" style="gap:10px">
     <div class="field s2"><label>Nome / Empresa</label><input type="text" id="cliedit-nome" placeholder="Nome completo ou empresa"></div>
@@ -590,26 +587,32 @@ body.locked{overflow:hidden}
   </div>
 </div></div>
 
-<div class="modal-bg" id="modal-produtos-sel"><div class="modal"><h3>Seleccionar Produto</h3>
+<div class="modal-bg" id="modal-produtos-sel"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
+  <h3>Seleccionar Produto</h3>
   <input class="modal-search" id="search-prod-sel" placeholder="Pesquisar produto..." oninput="renderModalProdutosSel()">
-  <div id="modal-prod-sel-list"></div><div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div></div></div>
+  <div id="modal-prod-sel-list"></div>
+  <div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-novo-produto"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3 id="modal-prod-titulo">Novo Produto</h3><input type="hidden" id="prod-edit-id">
   <div class="form-grid" style="gap:10px">
     <div class="field"><label>Referência / Código</label><input type="text" id="prod-ref" placeholder="REF001"></div>
     <div class="field"><label>Unidade</label><select id="prod-un"><option>Un</option><option>Kg</option><option>Lt</option><option>M</option><option>M²</option><option>M³</option><option>Cx</option><option>Pc</option><option>Ct</option><option>Hr</option><option>Vb</option><option>Sv</option></select></div>
     <div class="field s2"><label>Descrição</label><input type="text" id="prod-desc" placeholder="Descrição completa"></div>
     <div class="field"><label>Preço Unitário</label><input type="number" id="prod-pu" placeholder="0.00" min="0" step="0.01"></div>
-    <div class="field"><label>Preço de Compra (opcional)</label><input type="number" id="prod-pc" placeholder="Opcional" min="0" step="0.01"></div>
     <div class="field"><label>IVA %</label><select id="prod-iva"><option value="0">0%</option><option value="5">5%</option><option value="10">10%</option><option value="16" selected>16%</option><option value="17">17%</option><option value="20">20%</option></select></div>
-    <div class="field"><label>Stock actual</label><input type="number" id="prod-stock" value="0" min="0" step="0.01"></div>
+    <div class="field"><label>Stock actual</label><input type="number" id="prod-stock" value="0" step="0.01"></div>
     <div class="field"><label>Stock mínimo</label><input type="number" id="prod-stockmin" value="0" step="0.01"></div>
     <div class="field s2"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-weight:600;color:var(--text);font-size:13px"><input type="checkbox" id="prod-rastrear" checked> Controlar stock deste produto</label></div>
   </div>
-  <div class="btn-bar"><button class="btn btn-primary" onclick="salvarProduto()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-primary" onclick="salvarProduto()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-movstock"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3 id="mov-titulo">Movimento de Stock</h3>
   <div class="alert alert-info" id="mov-prod-info" style="font-size:12px"></div>
   <input type="hidden" id="mov-prod-id">
@@ -623,21 +626,27 @@ body.locked{overflow:hidden}
     <div class="field s2"><label>Motivo</label><input type="text" id="mov-motivo" placeholder="Ex.: Compra ao fornecedor ABC"></div>
   </div>
   <div class="alert alert-info" id="mov-preview" style="font-size:12px;margin-top:10px;display:none"></div>
-  <div class="btn-bar"><button class="btn btn-primary" onclick="confirmarMovStock()">Registar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-primary" onclick="confirmarMovStock()">Registar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-histstock"><div class="modal" style="max-width:820px">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3>Movimentos de Stock</h3>
   <input class="modal-search" id="hist-q" placeholder="Filtrar..." oninput="renderHistStock()">
   <div id="hist-list" class="res-wrap" style="max-height:480px;overflow:auto"></div>
-  <div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-guardar"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3>Guardar Cotação</h3>
   <p style="font-size:13px;color:var(--muted);margin-bottom:12px">A cotação será guardada. Os produtos e o cliente novos serão adicionados automaticamente.</p>
   <div class="alert alert-success" id="guardar-info" style="display:none"></div>
-  <div class="btn-bar"><button class="btn btn-primary" onclick="confirmarGuardar()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-primary" onclick="confirmarGuardar()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-emitir"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3 id="em-titulo">Emitir Factura</h3>
   <div class="alert alert-info" id="em-info" style="font-size:12px"></div>
   <div id="em-stock-alerta"></div>
@@ -650,9 +659,11 @@ body.locked{overflow:hidden}
     </div>
     <div class="field s2"><label>Observações</label><textarea id="em-obs" rows="2"></textarea></div>
   </div>
-  <div class="btn-bar"><button class="btn btn-primary" id="em-btn-emitir" onclick="confirmarEmitir()">Emitir</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-primary" id="em-btn-emitir" onclick="confirmarEmitir()">Emitir</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-recibo"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3>Emitir Recibo</h3>
   <div class="alert alert-info" id="rc-info" style="font-size:12px"></div>
   <div class="form-grid" style="gap:10px">
@@ -664,9 +675,11 @@ body.locked{overflow:hidden}
     </div>
     <div class="field s2"><label>Observações</label><textarea id="rc-obs" rows="2"></textarea></div>
   </div>
-  <div class="btn-bar"><button class="btn btn-primary" onclick="confirmarRecibo()">Emitir</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-primary" onclick="confirmarRecibo()">Emitir</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-usuario"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3 id="usr-titulo">Novo utilizador</h3><input type="hidden" id="usr-id">
   <div class="form-grid" style="gap:10px">
     <div class="field"><label>Nome completo</label><input type="text" id="usr-nome"></div>
@@ -682,9 +695,11 @@ body.locked{overflow:hidden}
   </div>
   <div class="alert alert-info" id="usr-role-desc" style="font-size:12px;margin-top:10px"></div>
   <div class="alert alert-danger" id="usr-erro" style="display:none;margin-top:8px"></div>
-  <div class="btn-bar"><button class="btn btn-primary" onclick="guardarUsuario()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-primary" onclick="guardarUsuario()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-conta"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3>A minha conta</h3>
   <div class="alert alert-info" id="conta-info" style="font-size:12px"></div>
   <div id="conta-senha-box">
@@ -701,9 +716,11 @@ body.locked{overflow:hidden}
     </div>
     <div class="alert alert-danger" id="conta-erro" style="display:none;margin-top:8px"></div>
   </div>
-  <div class="btn-bar"><button class="btn btn-primary" id="conta-btn" onclick="alterarMinhaSenha()">Alterar palavra-passe</button><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-primary" id="conta-btn" onclick="alterarMinhaSenha()">Alterar palavra-passe</button><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div>
+</div></div>
 
 <div class="modal-bg" id="modal-setup"><div class="modal">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
   <h3>Primeiro acesso — criar utilizador Master</h3>
   <p style="font-size:12.5px;color:var(--muted);margin-bottom:12px">Ainda não existem utilizadores. Crie agora o utilizador <strong>master</strong>.</p>
   <div class="form-grid" style="gap:10px">
@@ -717,37 +734,20 @@ body.locked{overflow:hidden}
     </div>
   </div>
   <div class="alert alert-danger" id="setup-erro" style="display:none;margin-top:8px"></div>
-  <div class="btn-bar"><button class="btn btn-primary" id="setup-btn" onclick="confirmarSetupMaster()">Criar Master e entrar</button></div></div></div>
-
-<div class="modal-bg" id="modal-offline"><div class="modal">
-  <h3>Está a trabalhar offline</h3>
-  <div class="alert alert-info" style="font-size:13px;line-height:1.7">
-    <strong>Atenção:</strong> offline, use <strong>um único computador/navegador</strong>.<br>
-    • Tudo fica guardado neste dispositivo e será enviado quando a ligação voltar.<br>
-    • Depois de <strong>8 horas sem ligação</strong>, a aplicação bloqueia.
-  </div>
-  <div class="btn-bar"><button class="btn btn-primary" onclick="fecharModal()">Entendi</button></div></div></div>
-
-<div class="modal-bg" id="modal-pin"><div class="modal">
-  <h3>Acesso Restrito</h3>
-  <p style="font-size:13px;color:var(--muted);margin-bottom:12px">Introduza o PIN.</p>
-  <div class="pass-wrap"><input type="password" id="pin-input" placeholder="PIN" maxlength="10" inputmode="numeric" onkeydown="if(event.key==='Enter') confirmarPin()" style="text-align:center;letter-spacing:4px;font-size:18px"><button type="button" class="eye" onclick="togglePass('pin-input', this)" data-eye></button></div>
-  <div class="alert alert-danger" id="pin-erro" style="display:none;margin-top:8px">PIN incorrecto.</div>
-  <div class="btn-bar" style="margin-top:12px"><button class="btn btn-primary" onclick="confirmarPin()">Entrar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div></div></div>
+  <div class="btn-bar"><button class="btn btn-primary" id="setup-btn" onclick="confirmarSetupMaster()">Criar Master e entrar</button></div>
+</div></div>
 
 <script>
 'use strict';
 
 const VERSAO_APP = '2026-10-11-v13';
-const LOGIN_USER = 'dullas';
-const LOGIN_PASS = 'dullayes';
 const _DBC = [104,116,116,112,115,58,47,47,115,99,114,105,112,116,46,103,111,111,103,108,101,46,99,111,109,47,109,97,99,114,111,115,47,115,47,65,75,102,121,99,98,121,89,65,49,118,97,84,90,51,56,77,88,66,107,111,69,121,122,118,80,49,87,87,70,48,75,89,116,83,112,66,97,81,79,105,121,116,104,45,115,71,105,71,52,102,111,49,66,105,102,45,70,71,57,65,65,95,99,81,106,111,112,55,121,65,121,47,101,120,101,99];
 function _dbDef() { return String.fromCharCode.apply(null, _DBC); }
 const _XK = 0x5A;
-function _xEnc(s) { let r=''; for (let i=0;i<s.length;i++) r += String.fromCharCode(s.charCodeAt(i)^_XK); return btoa(r); }
-function _xDec(s) { try { let d=atob(s), r=''; for (let i=0;i<d.length;i++) r += String.fromCharCode(d.charCodeAt(i)^_XK); return r; } catch(e) { return ''; } }
+function _xEnc(s) { let r = ''; for (let i = 0; i < s.length; i++) r += String.fromCharCode(s.charCodeAt(i) ^ _XK); return btoa(r); }
+function _xDec(s) { try { let d = atob(s), r = ''; for (let i = 0; i < d.length; i++) r += String.fromCharCode(d.charCodeAt(i) ^ _XK); return r; } catch (e) { return ''; } }
 
-/* ───────────── ÍCONES SVG (monocromáticos) ───────────── */
+/* ───────────── ÍCONES SVG ───────────── */
 const ICONS = {
   novo:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>',
   guardadas:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
@@ -793,9 +793,8 @@ const ICONS = {
 };
 
 let SESSAO = null;
-let _bootCred = null;
 let _inactivityTimer = null;
-const INACTIVITY_MS = 2 * 60 * 1000; /* 2 minutos */
+const INACTIVITY_MS = 10 * 60 * 1000; /* 10 minutos */
 
 const ROLES_INFO = {
   master:       { nome: 'Master',       desc: 'Acesso total. Único com acesso às Configurações.' },
@@ -814,7 +813,7 @@ function pode(p)    { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P[p
 function podeVer(t) { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P.tabs.includes(t)); }
 function painelActivo() { const el = document.querySelector('.panel.active'); return el ? el.id.replace('tab-', '') : 'cotacao'; }
 
-/* ───────────── INJETAR ÍCONES NAS TABS ESTÁTICAS ───────────── */
+/* ───────────── INJECTAR ÍCONES ───────────── */
 function aplicarIconesTabs() {
   document.querySelectorAll('.tab[data-icon]').forEach(t => {
     const ico = ICONS[t.dataset.icon];
@@ -841,14 +840,14 @@ function togglePass(id, btn) {
   else { el.type = 'password'; btn.innerHTML = ICONS.eye; }
 }
 
-/* ───────────── SESSÃO E INATIVIDADE ───────────── */
+/* ───────────── SESSÃO / INATIVIDADE ───────────── */
 function reiniciarTimerInatividade() {
   if (!SESSAO) return;
   clearTimeout(_inactivityTimer);
   _inactivityTimer = setTimeout(() => {
     if (SESSAO) {
-      try { registarLog('AUTH_INATIVIDADE', 'Sessão', SESSAO.username, 'Sessão encerrada por 2 minutos de inatividade'); } catch(e){}
-      alert('A sessão foi encerrada automaticamente após 2 minutos de inatividade.');
+      try { registarLog('AUTH_INATIVIDADE', 'Sessão', SESSAO.username, 'Sessão encerrada por inatividade'); } catch(e){}
+      alert('A sessão foi encerrada automaticamente após 10 minutos de inatividade.');
       terminarSessaoSilencioso();
     }
   }, INACTIVITY_MS);
@@ -858,6 +857,7 @@ function pararTimerInatividade() { clearTimeout(_inactivityTimer); _inactivityTi
   document.addEventListener(ev, reiniciarTimerInatividade, true);
 });
 
+/* ───────────── SHA-256 LOCAL (para logs) ───────────── */
 function sha256(str) {
   const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
   const bytes = unescape(encodeURIComponent(str)).split('').map(c => c.charCodeAt(0));
@@ -887,39 +887,25 @@ function sha256(str) {
   }
   return h.map(x => ('00000000' + (x >>> 0).toString(16)).slice(-8)).join('');
 }
-function hashLocal(salt, pass) { let h = salt + '|' + pass; for (let i = 0; i < 2000; i++) h = sha256(h + salt); return h; }
-
-function guardarVerificadorOffline(username, pass, user) {
-  const cache = JSON.parse(localStorage.getItem('authCache') || '{}');
-  const salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  cache[username] = { salt, hash: hashLocal(salt, pass), nome: user.nome, role: user.role };
-  localStorage.setItem('authCache', JSON.stringify(cache));
-}
-function verificarOffline(username, pass) {
-  const c = (JSON.parse(localStorage.getItem('authCache') || '{}'))[username];
-  if (!c || hashLocal(c.salt, pass) !== c.hash) return null;
-  return { username, nome: c.nome, role: c.role };
-}
 
 function mostrarErroLogin(msg) {
   const erro = document.getElementById('login-erro');
   erro.textContent = msg; erro.style.display = 'block';
   const p = document.getElementById('login-pass'); p.value = ''; p.focus();
 }
+
 function entrarNoSistema() {
-  /* Sem sessionStorage: refresh obriga a login */
   document.getElementById('login-screen').classList.add('hidden');
   document.body.classList.remove('locked');
   document.getElementById('login-erro').style.display = 'none';
   aplicarPermissoes();
-  atualizarBannerOffline();
-  if (!_online) avisarOffline();
-  if (typeof ligarComRetry === 'function' && temDB()) ligarComRetry();
   reiniciarTimerInatividade();
+  setConnStatus('ok', 'Ligado');
   setTimeout(() => {
     if (painelActivo() === 'clientes') renderClientes();
   }, 100);
 }
+
 async function confirmarLogin() {
   const user = document.getElementById('login-user').value.trim().toLowerCase();
   const pass = document.getElementById('login-pass').value;
@@ -928,36 +914,28 @@ async function confirmarLogin() {
   btn.disabled = true; btn.textContent = 'A entrar...';
   try {
     const r = await dbCall('login', { username: user, password: pass });
-    if (r && r.ok) {
+    if (!r) { mostrarErroLogin('Sem ligação ao servidor. Verifique a internet.'); return; }
+    if (r.ok) {
       SESSAO = { username: r.user.username, nome: r.user.nome, role: r.user.role, token: r.token };
-      guardarVerificadorOffline(r.user.username, pass, r.user);
-      localStorage.setItem('authAtivo', '1');
+      _ultimoPoll = new Date(0).toISOString();
       entrarNoSistema();
-      if (r.user.trocarSenha) pedirTrocaSenha();
+      sincronizarTudo();
       return;
     }
-    if (r && r.code === 'NOUSERS') {
-      if (user === LOGIN_USER && pass === LOGIN_PASS) {
-        _bootCred = { user, pass };
-        SESSAO = { username: user, nome: 'Administrador', role: 'master', token: '', legacy: true };
-        entrarNoSistema(); abrirSetupMaster(); return;
-      }
-      mostrarErroLogin('Ainda não existem utilizadores.'); return;
+    if (r.code === 'NOUSERS') {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.body.classList.remove('locked');
+      abrirSetupMaster();
+      return;
     }
-    if (r && r.ok === false && !/Acção desconhecida/.test(r.error || '')) { mostrarErroLogin(r.error || 'Não foi possível iniciar sessão.'); return; }
-    if (verificarLimiteOffline()) return;
-    const off = verificarOffline(user, pass);
-    if (off) { SESSAO = Object.assign({ token: '' }, off); registarLog('AUTH_LOGIN_OFFLINE', 'Sessão', off.username, 'Início de sessão sem ligação'); entrarNoSistema(); showToast('Modo offline.'); return; }
-    if (!localStorage.getItem('authAtivo') && user === LOGIN_USER && pass === LOGIN_PASS) {
-      SESSAO = { username: user, nome: 'Administrador', role: 'master', token: '', legacy: true };
-      entrarNoSistema(); return;
-    }
-    mostrarErroLogin(r === null ? 'Sem ligação à Base de Dados.' : 'Utilizador ou palavra-passe incorrectos.');
+    mostrarErroLogin(r.error || 'Utilizador ou palavra-passe incorrectos.');
   } finally { btn.disabled = false; btn.textContent = 'Entrar'; }
 }
+
 function mostrarLogin(msg) {
   SESSAO = null;
   pararTimerInatividade();
+  if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
   document.querySelectorAll('.tab[data-tab]').forEach(t => { t.hidden = true; });
   document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
   document.getElementById('login-screen').classList.remove('hidden');
@@ -968,36 +946,27 @@ function mostrarLogin(msg) {
   if (msg) { erro.textContent = msg; erro.style.display = 'block'; } else erro.style.display = 'none';
   setTimeout(() => document.getElementById('login-user').focus(), 50);
 }
+
 function terminarSessaoSilencioso() {
   try { registarLog('AUTH_LOGOUT', 'Sessão', SESSAO ? SESSAO.username : '', 'Fim de sessão automático'); } catch(e){}
-  enviarLogs();
-  { const tk = SESSAO && SESSAO.token; if (tk) setTimeout(() => dbCallRaw('logout', { token: tk }), 1500); }
-  _configDesbloqueado = false;
+  const tk = SESSAO && SESSAO.token;
+  if (tk) dbCallRaw('logout', { token: tk });
   mostrarLogin();
 }
 function terminarSessao() {
   if (!confirm('Terminar sessão?')) return;
   registarLog('AUTH_LOGOUT', 'Sessão', SESSAO ? SESSAO.username : '', 'Fim de sessão');
-  enviarLogs();
-  { const tk = SESSAO && SESSAO.token; if (tk) setTimeout(() => dbCallRaw('logout', { token: tk }), 1500); }
-  _configDesbloqueado = false;
+  const tk = SESSAO && SESSAO.token;
+  if (tk) setTimeout(() => dbCallRaw('logout', { token: tk }), 300);
   mostrarLogin();
 }
 function sessaoExpirada(msg) {
   if (!SESSAO) return;
-  registarLog('AUTH_EXPIRADA', 'Sessão', SESSAO.username, 'Sessão expirada');
+  try { registarLog('AUTH_EXPIRADA', 'Sessão', SESSAO.username, 'Sessão expirada'); } catch(e){}
   fecharModal();
   mostrarLogin(msg || 'Sessão expirada. Inicie sessão novamente.');
 }
-/* REFRESH: pedir sempre password */
-function verificarSessao() {
-  pararTimerInatividade();
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.body.classList.add('locked');
-  document.querySelectorAll('.panel').forEach(p => { p.hidden = true; });
-  document.querySelectorAll('.tab[data-tab]').forEach(t => { t.hidden = true; });
-  setTimeout(() => document.getElementById('login-user').focus(), 50);
-}
+
 function abrirSetupMaster() {
   ['setup-nome','setup-username','setup-pass','setup-pass2'].forEach(i => document.getElementById(i).value = '');
   document.getElementById('setup-erro').style.display = 'none';
@@ -1016,24 +985,29 @@ async function confirmarSetupMaster() {
   if (!/[^a-zA-Z0-9]/.test(p1)) return falha('Inclua um símbolo.');
   if (p1 !== p2) return falha('As palavras-passe não coincidem.');
   const btn = document.getElementById('setup-btn'); btn.disabled = true;
-  const r = await dbCall('setupMaster', { bootUser: _bootCred.user, bootPass: _bootCred.pass, username, nome, password: p1 });
+  const r = await dbCall('setupMaster', { username, nome, password: p1 });
   btn.disabled = false;
   if (!r || !r.ok) return falha((r && r.error) || 'Sem ligação. Tente novamente.');
   SESSAO = { username: r.user.username, nome: r.user.nome, role: r.user.role, token: r.token };
-  guardarVerificadorOffline(r.user.username, p1, r.user);
-  localStorage.setItem('authAtivo', '1');
-  _bootCred = null;
-  fecharModal(); entrarNoSistema();
+  _ultimoPoll = new Date(0).toISOString();
+  fecharModal(); entrarNoSistema(); sincronizarTudo();
   showToast('Master criado.');
 }
 
+/* ───────────── ESTADO GLOBAL ───────────── */
 let items = [];
 let itemIdx = 0;
-const LOGO_PADRAO = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNzcuNCA2OS40Ij48cGF0aCBmaWxsPSIjZjQ4MTIwIiBkPSJNMjUuMTUsMTcuMTlWMzkuMTFIMTlWMjMuODVMMTQuNzQsMzkuMTFIMTEuMTlMNi44MSwyNC4xMXYxNUg0LjY3VjE3LjE5aDYuNDZsMy43NiwxMy4yMywzLjc0LTEzLjIzWiIvPjwvc3ZnPg==';
+const LOGO_PADRAO = '';
 let logoData = LOGO_PADRAO;
 let _itemParaSel = null;
+let _syncEmCurso = false;
+let _ultimoPoll = new Date(0).toISOString();
+let _pollTimer = null;
+let _pollEmCurso = false;
+let _online = true;
+let _nArquivos = 0;
 
-/* ════════ BASE DE DADOS ════════ */
+/* ───────────── BASE DE DADOS ───────────── */
 function getDbUrl() {
   const enc = localStorage.getItem('cfg-db-url');
   if (enc) {
@@ -1066,6 +1040,16 @@ function alternarEdicaoDB() {
     btn.textContent = 'Alterar';
   }
 }
+
+function setConnStatus(estado, txt) {
+  const el = document.getElementById('conn-status');
+  if (!el) return;
+  el.className = estado;
+  document.getElementById('conn-txt').textContent = txt;
+  if (estado === 'ok') _online = true;
+  if (estado === 'err') _online = false;
+}
+
 async function dbCallRaw(action, payload) {
   const url = getDbUrl();
   if (!url) return null;
@@ -1076,301 +1060,183 @@ async function dbCallRaw(action, payload) {
       body: JSON.stringify({ action, token: (SESSAO && SESSAO.token) || undefined, ...payload })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const texto = await res.text();
-    let json;
-    try { json = JSON.parse(texto); }
-    catch (parseErr) { throw new Error('Resposta inesperada do servidor.'); }
-    marcarOnline();
+    const json = await res.json();
+    setConnStatus('ok', 'Ligado');
     if (json && json.ok === false) {
       if (json.code === 'AUTH') sessaoExpirada(json.error);
       else if (json.code === 'PERM') showToast('⛔ ' + json.error);
-      else if (json.code === 'TROCAR_SENHA') pedirTrocaSenha();
     }
     return json;
   } catch (err) {
-    setDbStatus(false, '❌ ' + (err.message || 'Falha de ligação'));
-    marcarOffline();
+    setConnStatus('err', 'Sem ligação');
     return null;
   }
 }
+async function dbCall(action, payload) { return dbCallRaw(action, payload); }
 
-const LIMITE_OFFLINE_MS = 8 * 3600 * 1000;
-const ESCRITAS = { saveCliente:1, deleteCliente:1, saveProduto:1, deleteProduto:1, saveCotacao:1, deleteCotacao:1, saveDocumento:1, saveConfig:1, saveMovStock:1 };
-let _online = true, _avisoOfflineMostrado = false, _flushEmCurso = false;
-
-function getFila() { try { return JSON.parse(localStorage.getItem('outbox') || '[]'); } catch (e) { return []; } }
-function setFila(f) { localStorage.setItem('outbox', JSON.stringify(f)); }
-function chaveFila(action, p) {
-  if (action === 'saveCotacao')   return 'cot:' + p.cotacao.num;
-  if (action === 'deleteCotacao') return 'cot:' + p.num;
-  if (action === 'saveDocumento') return 'doc:' + p.documento.id;
-  if (action === 'saveCliente')   return 'cli:' + p.cliente.id;
-  if (action === 'deleteCliente') return 'cli:' + p.id;
-  if (action === 'saveProduto')   return 'prod:' + p.produto.id;
-  if (action === 'deleteProduto') return 'prod:' + p.id;
-  if (action === 'saveMovStock')  return 'mov:' + p.movimento.id;
-  return 'cfg';
-}
-function enfileirar(action, payload) {
-  let f = getFila();
-  const k = chaveFila(action, payload);
-  if (k === 'cfg') {
-    const antigo = f.find(x => x.k === 'cfg');
-    payload = { config: Object.assign({}, antigo ? antigo.payload.config : {}, payload.config || {}) };
-  }
-  f = f.filter(x => x.k !== k);
-  f.push({ k, action, payload: JSON.parse(JSON.stringify(payload)), ts: Date.now() + Math.random(), por: SESSAO ? SESSAO.username : '' });
-  setFila(f);
-  atualizarBannerOffline();
-}
-let _escritasEmCurso = 0;
-async function dbCall(action, payload) {
-  if (!ESCRITAS[action]) return dbCallRaw(action, payload);
-  _escritasEmCurso++;
-  try {
-    const r = await dbCallRaw(action, payload);
-    if (r === null && temDB()) enfileirar(action, payload || {});
-    return r;
-  } finally { _escritasEmCurso--; }
-}
-function marcarOnline() {
-  const estavaOffline = !_online;
-  if (estavaOffline) registarLog('SYS_ONLINE', 'Sistema', '', 'Ligação restabelecida');
-  _online = true;
-  localStorage.setItem('ultimoOnline', String(Date.now()));
-  localStorage.setItem('relogioMax', String(Date.now()));
-  _avisoOfflineMostrado = false;
-  document.getElementById('offline-bloqueio').hidden = true;
-  atualizarBannerOffline();
-  if (estavaOffline && SESSAO) setTimeout(() => { if (!_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); } }, 300);
-}
-function marcarOffline() {
-  if (!temDB()) return;
-  if (_online) registarLog('SYS_OFFLINE', 'Sistema', '', 'Sem ligação');
-  _online = false;
-  if (!localStorage.getItem('ultimoOnline')) localStorage.setItem('ultimoOnline', String(Date.now()));
-  atualizarBannerOffline();
-  if (!verificarLimiteOffline()) avisarOffline();
-}
-function offlineMs() { return Date.now() - (+localStorage.getItem('ultimoOnline') || Date.now()); }
-function formatarRestante(ms) { const m = Math.max(0, Math.floor(ms / 60000)); return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'min'; }
-function atualizarBannerOffline() {
-  const b = document.getElementById('offline-banner');
-  if (!b) return;
-  if (_online || !SESSAO) { b.hidden = true; return; }
-  const pend = getFila().length;
-  b.hidden = false;
-  b.innerHTML = ICONS.wifi + ` <span>Modo offline — restam ${formatarRestante(LIMITE_OFFLINE_MS - offlineMs())}` + (pend ? ` · ${pend} por enviar` : '') + '</span>';
-}
-function avisarOffline() {
-  if (_online || !SESSAO || _avisoOfflineMostrado) return;
-  _avisoOfflineMostrado = true;
-  document.getElementById('modal-offline').classList.add('open');
-}
-function verificarLimiteOffline() {
-  if (!temDB() || _online) return false;
-  const agora = Date.now(), maxRel = +localStorage.getItem('relogioMax') || 0;
-  let motivo = '';
-  if (agora < maxRel - 120000) motivo = 'O relógio do computador foi alterado para trás.';
-  else if (offlineMs() > LIMITE_OFFLINE_MS) motivo = 'Mais de 8 horas sem ligação.';
-  if (!motivo) { localStorage.setItem('relogioMax', String(Math.max(maxRel, agora))); return false; }
-  document.getElementById('ob-msg').textContent = motivo;
-  if (document.getElementById('offline-bloqueio').hidden) registarLog('SYS_BLOQUEIO', 'Sistema', '', motivo);
-  document.getElementById('offline-bloqueio').hidden = false;
-  return true;
-}
-async function tentarReligar() {
-  const btn = document.getElementById('ob-btn'), est = document.getElementById('ob-estado');
-  btn.disabled = true; est.textContent = 'A tentar ligar...';
-  const r = await dbCallRaw('status', {});
-  btn.disabled = false;
-  if (r) { est.textContent = ''; showToast('Ligação restabelecida.'); } else { est.textContent = 'Ainda sem ligação.'; }
-}
-function iniciarVigilanciaOffline() {
-  if (!localStorage.getItem('ultimoOnline')) localStorage.setItem('ultimoOnline', String(Date.now()));
-  window.addEventListener('offline', () => { if (temDB()) marcarOffline(); });
-  setInterval(async () => {
-    if (!_online) {
-      atualizarBannerOffline();
-      if (verificarLimiteOffline()) return;
-      if (navigator.onLine !== false) await dbCallRaw('status', {});
+/* ───────────── POLLING EM TEMPO REAL ───────────── */
+function iniciarPolling() {
+  const intervalo = () => document.visibilityState === 'visible' ? 3000 : 10000;
+  const ciclo = async () => {
+    if (!SESSAO || !temDB() || !_online || _pollEmCurso) {
+      _pollTimer = setTimeout(ciclo, intervalo());
+      return;
     }
-  }, 30000);
-  if (temDB()) {
-    if (navigator.onLine === false) marcarOffline();
-    dbCallRaw('status', {});
-  }
-}
-function renumerar(num, seq) {
-  const m = String(num).match(/^(.*?)(\d+)\/(.*)$/);
-  return m ? m[1] + String(seq).padStart(Math.max(4, m[2].length), '0') + '/' + m[3] : num;
-}
-function resolverConflitoFila(it, r) {
-  if (it.action === 'saveCotacao') {
-    const c = it.payload.cotacao, antigo = c.num;
-    let seq = Math.max(seqMaximo(), +r.maxSeq || 0);
-    let novo; do { seq++; novo = renumerar(antigo, seq); } while (novo === antigo);
-    const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]');
-    const lc = cots.find(x => x.num === antigo && x.uid === c.uid);
-    if (lc) { lc.num = novo; localStorage.setItem('cotacoes', JSON.stringify(cots)); }
-    c.num = novo;
-    const f = getFila();
-    f.forEach(x => {
-      if (x.ts === it.ts) { x.k = 'cot:' + novo; x.payload.cotacao.num = novo; }
-      if (x.action === 'saveDocumento' && x.payload.documento.origem === antigo) x.payload.documento.origem = novo;
-    });
-    setFila(f);
-    registarSeq(seq);
-    if (gv('cot-num') === antigo) document.getElementById('cot-num').value = novo;
-    avisarRenumeracao(`Cotação ${antigo} → ${novo}`);
-    return true;
-  }
-  if (it.action === 'saveDocumento') {
-    const d = it.payload.documento, antigoId = d.id, antigoNum = d.num;
-    const T = TIPOS_DOC[d.tipo];
-    let seq = Math.max(seqMaximoDoc(d.tipo), +r.maxSeq || 0);
-    let novo; do { seq++; novo = renumerar(antigoNum, seq); } while (novo === antigoNum);
-    const novoId = docId(d.tipo, novo);
-    const docs = getDocs();
-    const ld = docs.find(x => x.id === antigoId && x.uid === d.uid);
-    if (ld) { ld.num = novo; ld.id = novoId; }
-    docs.forEach(x => { if (x.tipo === 'RC' && x.facturaId === antigoId) { x.facturaId = novoId; x.origem = novo; } });
-    setDocs(docs);
-    d.num = novo; d.id = novoId;
-    const f = getFila();
-    f.forEach(x => {
-      if (x.ts === it.ts) x.k = 'doc:' + novoId;
-      if (x.action === 'saveDocumento' && x.payload.documento.tipo === 'RC' && x.payload.documento.facturaId === antigoId) {
-        x.payload.documento.facturaId = novoId; x.payload.documento.origem = novo;
+    _pollEmCurso = true;
+    try {
+      const r = await dbCallRaw('poll', { since: _ultimoPoll });
+      if (r && r.ok) {
+        _ultimoPoll = r.ts;
+        aplicarMudancasRemotas(r);
       }
-    });
-    setFila(f);
-    registarSeqDoc(d.tipo, seq);
-    avisarRenumeracao(`${T.nome} ${antigoNum} → ${novo}`);
-    return true;
-  }
-  return false;
-}
-function avisarRenumeracao(txt) {
-  registarLog('SYS_RENUMERADA', 'Sistema', txt, 'Número já existia online');
-  showToast('🔢 Numeração ajustada: ' + txt);
-  alert('Numeração ajustada: ' + txt);
-}
-async function esvaziarFila() {
-  if (_flushEmCurso) return false;
-  _flushEmCurso = true;
-  try {
-    for (let guarda = 0; guarda < 1000; guarda++) {
-      const f = getFila();
-      if (!f.length) return true;
-      const it = f[0];
-      const r = await dbCallRaw(it.action, it.payload);
-      if (r === null) return false;
-      if (r.ok === false && r.code === 'AUTH') return false;
-      if (r.ok === false && r.code === 'CONFLICT') { if (resolverConflitoFila(it, r)) continue; }
-      setFila(getFila().filter(x => !(x.k === it.k && x.ts === it.ts)));
+    } finally {
+      _pollEmCurso = false;
+      _pollTimer = setTimeout(ciclo, intervalo());
     }
-    return false;
-  } finally { _flushEmCurso = false; atualizarBannerOffline(); }
+  };
+  if (_pollTimer) clearTimeout(_pollTimer);
+  _pollTimer = setTimeout(ciclo, 1500);
+
+  window.addEventListener('online', () => {
+    setConnStatus('ok', 'Ligado');
+    if (temDB()) { showToast('Ligação restabelecida.'); _ultimoPoll = new Date(0).toISOString(); ligarComRetry(); }
+  });
+  window.addEventListener('offline', () => { setConnStatus('err', 'Sem ligação'); });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && SESSAO) {
+      clearTimeout(_pollTimer);
+      _pollTimer = setTimeout(ciclo, 300);
+    }
+  });
 }
-function setDbStatus(online, msg) {
-  const dot = document.getElementById('db-status-dot');
-  const txt = document.getElementById('db-status-text');
-  const box = document.getElementById('db-status-box');
-  if (!dot) return;
-  dot.textContent = online ? '🟢' : (temDB() ? '🔴' : '⚪');
-  txt.textContent = msg;
-  box.className = 'alert ' + (online ? 'alert-success' : 'alert-info');
-}
-async function diagnosticoDB() {
-  const box = document.getElementById('db-diag');
-  box.style.display = 'block';
-  box.textContent = 'A consultar...';
-  const r = await dbCall('diagnostico', {});
-  if (!r) { box.textContent = '❌ Sem resposta.'; return; }
-  if (r.ok === false) { box.textContent = '⚠️ ' + r.error; return; }
-  const loc = k => { try { return JSON.parse(localStorage.getItem(k) || '[]').length; } catch (e) { return 0; } };
-  box.textContent =
-    `Script versão: ${r.versao}\nSheet: ${r.planilha}\n\n` +
-    `Folha usada → registos:\n` +
-    Object.keys(r.usadas).map(t => `  ${t}: "${r.usadas[t]}" → ${r.contagens[t]}`).join('\n') +
-    `\n\nArmazenamento local: ${(usoArmazenamentoLocal() / 1048576).toFixed(2)} MB` +
-    `\n\nNeste dispositivo: ${loc('cotacoes')} cotações · ${loc('clientes')} clientes · ${loc('produtos')} produtos · ${loc('documentos')} documentos · ${loc('movstock')} movimentos`;
-}
-async function ligarBaseDados() {
-  if (_dbUrlVisivel) {
-    const url = gv('cfg-db-url').trim();
-    if (!url) { showToast('⚠️ URL vazio.'); return; }
-    setDbUrl(url);
-    _dbUrlVisivel = false;
-    document.getElementById('cfg-db-url').readOnly = true;
-    document.getElementById('cfg-db-url').value = mascararUrl(url);
-    document.getElementById('cfg-db-url').style.background = '#f6f8fc';
-    document.getElementById('btn-edit-db').textContent = 'Alterar';
+
+function aplicarMudancasRemotas(r) {
+  const afectadas = r.afectadas || [];
+  if (!afectadas.length) return;
+  let mudou = false;
+
+  if (r.cotacoes) {
+    localStorage.setItem('cotacoes', JSON.stringify(r.cotacoes.map(c => ({
+      ...c, num: String(c.num || ''), sub: +c.sub || 0, iva: +c.iva || 0, total: +c.total || 0,
+      moeda: c.moeda || 'MT', obs: c.obs ? String(c.obs) : '', items: Array.isArray(c.items) ? c.items : []
+    }))));
+    mudou = true;
   }
-  if (!getDbUrl()) { showToast('⚠️ Defina primeiro o URL.'); return; }
-  showToast('🔌 A testar ligação...');
-  setDbStatus(false, 'A testar...');
-  const r = await dbCall('ping', {});
-  if (r && r.ok) {
-    setDbStatus(true, 'Ligado com sucesso.');
-    showToast('Ligado à Base de Dados!');
-    await sincronizarTudo();
-  } else showToast('❌ Falha ao ligar.');
-}
-async function sincronizarTudo(silencioso, only) {
-  if (!temDB() || !SESSAO || _escritasEmCurso) return;
-  const filaOk = await esvaziarFila();
-  if (!filaOk && getFila().length) { setDbStatus(false, `${getFila().length} por enviar`); return; }
-  enviarLogs();
-  const r = await dbCallRaw('getAll', only ? { only } : {});
-  if (!r || !r.ok) { setDbStatus(false, 'Falha ao sincronizar.'); return; }
-  if (getFila().length) return;
+  if (r.clientes) { localStorage.setItem('clientes', JSON.stringify(r.clientes)); mudou = true; }
+  if (r.produtos) {
+    localStorage.setItem('produtos', JSON.stringify(r.produtos.map(p => ({
+      ...p, ref: String(p.ref || ''), desc: String(p.desc || ''), un: p.un || 'Un',
+      id: normId(p.id), pu: +p.pu || 0, iva: +p.iva || 0, stock: +p.stock || 0,
+      stockMin: +p.stockMin || 0, rastrear: p.rastrear !== 'nao' ? 'sim' : 'nao'
+    }))));
+    mudou = true;
+  }
+  if (r.documentos) { mesclarDocumentos(r.documentos); mudou = true; }
+  if (r.movstock) {
+    const mm = {};
+    getMovs().forEach(m => { mm[m.id] = m; });
+    r.movstock.forEach(m => { if (!mm[m.id]) mm[m.id] = m; });
+    setMovs(Object.values(mm).sort((a,b) => String(b.ts||'').localeCompare(String(a.ts||''))).slice(0, 5000));
+    mudou = true;
+  }
   if (r.config) {
     Object.keys(r.config).forEach(k => {
       if (['cotSeq','ftSeq','vdSeq','rcSeq'].includes(k)) return;
       if (r.config[k] !== '' && r.config[k] != null) localStorage.setItem(k, r.config[k]);
     });
     carregarConfig();
+    mudou = true;
   }
-  if (r.eu && SESSAO && !SESSAO.legacy && (r.eu.role !== SESSAO.role || r.eu.nome !== SESSAO.nome)) {
-    SESSAO.role = r.eu.role; SESSAO.nome = r.eu.nome;
-    aplicarPermissoes();
+
+  if (mudou) {
+    const ativo = painelActivo();
+    if (ativo === 'guardadas') renderCotList();
+    if (ativo === 'produtos') renderProdList();
+    if (ativo === 'documentos') renderDocList();
+    if (ativo === 'resumos') renderResumos();
+    if (ativo === 'clientes') renderClientes();
+    showToast('🔄 Dados actualizados');
   }
-  const guardar = (k, v) => localStorage.setItem(k, JSON.stringify(v));
-  if (Array.isArray(r.clientes)) guardar('clientes', r.clientes.map(c => ({
-    id: normId(c.id), nome: String(c.nome == null ? '' : c.nome), nuit: String(c.nuit == null ? '' : c.nuit), end: String(c.end == null ? '' : c.end),
-    cidade: String(c.cidade == null ? '' : c.cidade), tel: String(c.tel == null ? '' : c.tel), email: String(c.email == null ? '' : c.email),
-    criadoEm: c.criadoEm || '', atualizadoEm: c.atualizadoEm || '', criadoAuto: c.criadoAuto || '' })));
-  if (Array.isArray(r.produtos)) guardar('produtos', r.produtos.map(normProd));
-  if (Array.isArray(r.cotacoes)) guardar('cotacoes', r.cotacoes.map(c => ({
-    ...c, num: String(c.num == null ? '' : c.num), sub: +c.sub || 0, iva: +c.iva || 0, total: +c.total || 0,
-    moeda: c.moeda || 'MT', obs: c.obs ? String(c.obs) : '', items: Array.isArray(c.items) ? c.items : [] })).filter(c => c.num));
-  if (Array.isArray(r.documentos)) setDocs(r.documentos.map(normDoc).filter(d => d.id).sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || ''))));
-  if (Array.isArray(r.movstock)) setMovs(r.movstock.slice().sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || ''))).slice(0, 5000));
-  /* Numeração: o servidor atribui FT/VD/RC; localmente só se acompanha o valor do servidor */
-  if (r.config) ['FT','VD','RC'].forEach(t => { const k = TIPOS_DOC[t].seq; localStorage.setItem(k, Math.max(parseInt((r.config && r.config[k]) || 0) || 0, seqMaximoDoc(t))); });
-  if (r.config) localStorage.setItem('cotSeq', Math.max(parseInt((r.config && r.config.cotSeq) || 0) || 0, seqMaximo()));
-  if (_numAuto && gv('cot-num') === _numAuto) autoNum();
-  const nR = k => Array.isArray(r[k]) ? r[k].length : 0;
-  if (!only) setDbStatus(true, `Ligado. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
-    ` · app ${VERSAO_APP}` + (r.versao ? ` · script ${r.versao}` : '') + '.');
-  if (!silencioso) showToast('🔄 Sincronização concluída!');
-  const ativo = painelActivo();
-  if (ativo === 'guardadas') renderCotList();
-  if (ativo === 'produtos') renderProdList();
-  if (ativo === 'documentos') renderDocList();
-  if (ativo === 'resumos') renderResumos();
-  if (ativo === 'clientes') renderClientes();
-  return r.revs || true;
 }
-function normProd(p) {
-  return { ...p, ref: String(p.ref == null ? '' : p.ref), desc: String(p.desc == null ? '' : p.desc), un: p.un || 'Un', id: normId(p.id),
-    pu: +p.pu || 0, iva: +p.iva || 0, stock: Math.max(0, +p.stock || 0), stockMin: +p.stockMin || 0,
-    pcompra: (p.pcompra === '' || p.pcompra == null) ? '' : (+p.pcompra || 0), rastrear: p.rastrear !== 'nao' ? 'sim' : 'nao' };
+
+async function ligarComRetry(tentativa) {
+  if (!SESSAO) return;
+  tentativa = tentativa || 1;
+  const r = await dbCall('ping', {});
+  if (r && r.ok) { setConnStatus('ok', 'Ligado'); sincronizarTudo(); return; }
+  if (tentativa < 5) setTimeout(() => ligarComRetry(tentativa + 1), tentativa * 2000);
+  else setConnStatus('err', 'Sem ligação');
 }
+
+async function sincronizarTudo() {
+  if (!temDB() || !SESSAO || _syncEmCurso) return;
+  _syncEmCurso = true;
+  try {
+    const r = await dbCallRaw('getAll', {});
+    if (!r || !r.ok) { setConnStatus('err', 'Falha ao sincronizar'); return; }
+    const localDe = k => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };
+    if (Array.isArray(r.clientes)) {
+      localStorage.setItem('clientes', JSON.stringify(r.clientes.map(c => ({
+        id: normId(c.id), nome: String(c.nome == null ? '' : c.nome), nuit: String(c.nuit == null ? '' : c.nuit),
+        end: String(c.end == null ? '' : c.end), cidade: String(c.cidade == null ? '' : c.cidade),
+        tel: String(c.tel == null ? '' : c.tel), email: String(c.email == null ? '' : c.email),
+        criadoEm: c.criadoEm || '', atualizadoEm: c.atualizadoEm || '', criadoAuto: c.criadoAuto || ''
+      }))));
+    }
+    if (Array.isArray(r.produtos)) {
+      localStorage.setItem('produtos', JSON.stringify(r.produtos.map(p => ({
+        ...p, ref: String(p.ref == null ? '' : p.ref), desc: String(p.desc == null ? '' : p.desc),
+        un: p.un || 'Un', id: normId(p.id), pu: +p.pu || 0, iva: +p.iva || 0,
+        stock: +p.stock || 0, stockMin: +p.stockMin || 0, rastrear: p.rastrear !== 'nao' ? 'sim' : 'nao'
+      }))));
+    }
+    if (Array.isArray(r.cotacoes)) {
+      localStorage.setItem('cotacoes', JSON.stringify(r.cotacoes.map(c => ({
+        ...c, num: String(c.num == null ? '' : c.num), sub: +c.sub || 0, iva: +c.iva || 0, total: +c.total || 0,
+        moeda: c.moeda || 'MT', obs: c.obs ? String(c.obs) : '', items: Array.isArray(c.items) ? c.items : []
+      })).filter(c => c.num)));
+    }
+    if (Array.isArray(r.documentos)) mesclarDocumentos(r.documentos);
+    if (Array.isArray(r.movstock)) {
+      const mm = {};
+      getMovs().forEach(m => { mm[m.id] = m; });
+      r.movstock.forEach(m => { if (!mm[m.id]) mm[m.id] = m; });
+      setMovs(Object.values(mm).sort((a,b) => String(b.ts||'').localeCompare(String(a.ts||''))).slice(0, 5000));
+    }
+    if (r.config) {
+      Object.keys(r.config).forEach(k => {
+        if (['cotSeq','ftSeq','vdSeq','rcSeq'].includes(k)) return;
+        if (r.config[k] !== '' && r.config[k] != null) localStorage.setItem(k, r.config[k]);
+      });
+      carregarConfig();
+      ['FT','VD','RC'].forEach(t => {
+        const k = TIPOS_DOC[t].seq;
+        const rem = parseInt((r.config && r.config[k]) || 0) || 0;
+        const fin = Math.max(rem, seqMaximoDoc(t));
+        if (fin > (parseInt(localStorage.getItem(k) || 0) || 0)) localStorage.setItem(k, fin);
+      });
+      const seqRemoto = parseInt((r.config && r.config.cotSeq) || 0) || 0;
+      const seqFinal = Math.max(seqRemoto, seqMaximo());
+      if (seqFinal > (parseInt(localStorage.getItem('cotSeq') || 0) || 0)) localStorage.setItem('cotSeq', seqFinal);
+    }
+    if (r.eu && SESSAO && (r.eu.role !== SESSAO.role || r.eu.nome !== SESSAO.nome)) {
+      SESSAO.role = r.eu.role; SESSAO.nome = r.eu.nome;
+      aplicarPermissoes();
+    }
+    setConnStatus('ok', 'Sincronizado');
+    const ativo = painelActivo();
+    if (ativo === 'guardadas') renderCotList();
+    if (ativo === 'produtos') renderProdList();
+    if (ativo === 'documentos') renderDocList();
+    if (ativo === 'resumos') renderResumos();
+    if (ativo === 'clientes') renderClientes();
+  } finally { _syncEmCurso = false; }
+}
+
 function normId(id) { return (typeof id === 'number') ? id : (isNaN(+id) ? id : +id); }
 
+/* Storage cheio */
 (function () {
   const original = Storage.prototype.setItem;
   let avisado = false;
@@ -1382,70 +1248,30 @@ function normId(id) { return (typeof id === 'number') ? id : (isNaN(+id) ? id : 
     }
   };
 })();
-function usoArmazenamentoLocal() {
-  let b = 0;
-  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); b += (k.length + (localStorage.getItem(k) || '').length) * 2; } } catch (e) {}
-  return b;
-}
 
-/* ════════ INIT ════════ */
+/* ───────────── INIT ───────────── */
 document.addEventListener('DOMContentLoaded', () => {
-  verificarSessao();
+  mostrarLogin();
   carregarConfig();
   setDefaultDates();
   autoNum();
   addItem();
   const drop = document.getElementById('logo-drop');
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor='#1a4fa0'; });
-  drop.addEventListener('dragleave', () => { drop.style.borderColor=''; });
-  drop.addEventListener('drop', e => { e.preventDefault(); drop.style.borderColor=''; if(e.dataTransfer.files[0]) loadLogo(e.dataTransfer.files[0]); });
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.style.borderColor = '#1a4fa0'; });
+  drop.addEventListener('dragleave', () => { drop.style.borderColor = ''; });
+  drop.addEventListener('drop', e => { e.preventDefault(); drop.style.borderColor = ''; if (e.dataTransfer.files[0]) loadLogo(e.dataTransfer.files[0]); });
 
   const dbInput = document.getElementById('cfg-db-url');
   if (dbInput) dbInput.value = mascararUrl(getDbUrl());
-  if (getDbUrl() && SESSAO) ligarComRetry();
-  else setDbStatus(false, 'Ainda não ligado.');
 
-  iniciarLigacaoPersistente();
-  iniciarVigilanciaOffline();
-  if (SESSAO) atualizarBannerOffline();
+  iniciarPolling();
+  // Fallback: sincronização completa a cada 60s
+  setInterval(() => {
+    if (temDB() && SESSAO && _online && !_syncEmCurso) sincronizarTudo();
+  }, 60000);
 });
 
-let _syncEmCurso = false;
-async function ligarComRetry(tentativa) {
-  if (!SESSAO) return;
-  tentativa = tentativa || 1;
-  setDbStatus(false, 'A ligar' + (tentativa>1 ? ' (tentativa '+tentativa+')' : '') + '...');
-  const r = await dbCall('ping', {});
-  if (r && r.ok) { setDbStatus(true, 'Ligado.'); sincronizarTudo(); return; }
-  if (tentativa < 5) setTimeout(() => ligarComRetry(tentativa + 1), tentativa * 2000);
-  else setDbStatus(false, 'Não foi possível ligar. A trabalhar localmente.');
-}
-let _revs = null, _ultPoll = 0;
-function iniciarLigacaoPersistente() {
-  /* A cada 3 s: batimento (sessão única) + deteta o que outros utilizadores alteraram e vai buscar só essas listas */
-  setInterval(async () => {
-    if (!temDB() || !SESSAO || !SESSAO.token || _syncEmCurso) return;
-    if (document.hidden && Date.now() - _ultPoll < 20000) return;
-    _ultPoll = Date.now();
-    const r = await dbCallRaw('rev', {});
-    if (!r || !r.ok || !r.revs) return;
-    const mudou = _revs ? Object.keys(r.revs).filter(k => r.revs[k] !== _revs[k]) : null;
-    if (_revs && !mudou.length) return;
-    _syncEmCurso = true;
-    try { if (await sincronizarTudo(true, mudou || undefined)) _revs = r.revs; } finally { _syncEmCurso = false; }
-  }, 3000);
-  setInterval(() => {
-    if (temDB() && !_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); }
-  }, 120000);
-  window.addEventListener('online', () => {
-    if (temDB()) { showToast('Ligação restabelecida.'); ligarComRetry(); }
-  });
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && temDB() && !_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); }
-  });
-}
-
-/* ════════ DATAS ════════ */
+/* ───────────── DATAS ───────────── */
 function dataLocalISO(date) {
   const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
@@ -1483,7 +1309,7 @@ function prazoDeCond(txt) {
   return null;
 }
 
-/* ════════ NUMERAÇÃO ════════ */
+/* ───────────── NUMERAÇÃO ───────────── */
 let _numAuto = '';
 function seqDeNum(num) { const m = String(num || '').match(/(\d+)\//); return m ? parseInt(m[1], 10) : 0; }
 function seqMaximo() {
@@ -1507,7 +1333,7 @@ function autoNum() {
   document.getElementById('cot-num').value = _numAuto;
 }
 
-/* ════════ TABS ════════ */
+/* ───────────── TABS ───────────── */
 function switchTab(id) {
   if (SESSAO && !podeVer(id)) { showToast('⛔ Sem acesso.'); return; }
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1516,15 +1342,15 @@ function switchTab(id) {
   if (tabEl) tabEl.classList.add('active');
   const panelEl = document.getElementById('tab-' + id);
   if (panelEl) panelEl.classList.add('active');
-  if (id==='preview') gerarPreview();
-  if (id!=='preview') _docPreview = null;
-  if (id==='guardadas') renderCotList();
-  if (id==='documentos') renderDocList();
-  if (id==='clientes') renderClientes();
-  if (id==='resumos') iniciarResumos();
-  if (id==='produtos') renderProdList();
-  if (id==='config' && pode('utilizadores')) carregarUsuarios();
-  if (id==='config' && pode('db')) { carregarLogs(); carregarArquivos(); }
+  if (id === 'preview') gerarPreview();
+  if (id !== 'preview') _docPreview = null;
+  if (id === 'guardadas') renderCotList();
+  if (id === 'documentos') renderDocList();
+  if (id === 'clientes') renderClientes();
+  if (id === 'resumos') iniciarResumos();
+  if (id === 'produtos') renderProdList();
+  if (id === 'config' && pode('utilizadores')) carregarUsuarios();
+  if (id === 'config' && pode('db')) { carregarLogs(); carregarArquivos(); }
 }
 
 let _tipoDoc = 'COT';
@@ -1589,16 +1415,7 @@ function irParaEmitir(tipo, num) { abrirEmitir(tipo, num); }
 function irParaRecibo(idEnc) { abrirRecibo(idEnc); }
 function irParaNovoDocumento() { escolherTipoDoc('COT'); limparFormSilencioso(); switchTab('cotacao'); }
 
-const CONFIG_PIN = '654321';
-let _configDesbloqueado = false;
-function abrirConfigComPin() { if (podeVer('config')) { switchTab('config'); return; } showToast('⛔ Sem acesso.'); }
-function confirmarPin() {
-  const valor = document.getElementById('pin-input').value.trim();
-  if (valor === CONFIG_PIN) { _configDesbloqueado = true; fecharModal(); switchTab('config'); }
-  else { document.getElementById('pin-erro').style.display = 'block'; document.getElementById('pin-input').value = ''; }
-}
-
-/* ════════ ITENS ════════ */
+/* ───────────── ITENS ───────────── */
 function addItem() { items.push({id:++itemIdx, ref:'', desc:'', qtd:1, un:'Un', pu:0, iva:16}); renderItems(); }
 function removeItem(id) { items = items.filter(i=>i.id!==id); renderItems(); }
 function renderItems() {
@@ -1681,7 +1498,7 @@ function calcTotaisComDesconto() {
   return { sub: T.sub, desconto: T.desconto, descTipo, descValor, iva: T.iva, total: T.total };
 }
 
-/* ════════ CONFIGURAÇÕES ════════ */
+/* ───────────── CONFIGURAÇÕES ───────────── */
 function salvarConfig() {
   ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-prefix-ft','cfg-prefix-vd','cfg-prefix-rc','cfg-rodape','cfg-logo2']
     .forEach(f => localStorage.setItem(f, document.getElementById(f).value));
@@ -1695,7 +1512,7 @@ function salvarConfig() {
     ['emp-nome','emp-nuit','emp-end','emp-tel','emp-email','emp-web','emp-cidade','cfg-prefix','cfg-prefix-ft','cfg-prefix-vd','cfg-prefix-rc','cfg-rodape','cfg-cor','cfg-logo2']
       .forEach(f => cfg[f] = gv(f));
     if (logoData) cfg.logoData = logoData;
-    dbCall('saveConfig', { config: cfg }).then(r => { if (r && r.ok) setDbStatus(true, 'Configurações sincronizadas.'); });
+    dbCall('saveConfig', { config: cfg }).then(r => { if (r && r.ok) showToast('Configurações sincronizadas.'); });
   }
 }
 function carregarConfig() {
@@ -1756,6 +1573,7 @@ function loadLogo(file) {
 }
 function showLogoPreview(src) {
   const img = document.getElementById('logo-preview');
+  if (!src) { img.style.display = 'none'; document.getElementById('logo-text').textContent = 'Clique aqui ou arraste o logotipo'; return; }
   img.onerror = () => { img.style.display = 'none'; document.getElementById('logo-text').textContent = 'Erro ao carregar'; };
   img.src = src; img.style.display = 'block';
   document.getElementById('logo-text').textContent = 'Clique para substituir';
@@ -1768,10 +1586,43 @@ function removerLogo() {
   if (temDB()) dbCall('saveConfig', { config: { logoData: '' } });
 }
 
-/* ════════ CLIENTES ════════ */
-function getClientes() {
-  try { return JSON.parse(localStorage.getItem('clientes') || '[]'); } catch (e) { return []; }
+async function diagnosticoDB() {
+  const box = document.getElementById('db-diag');
+  box.style.display = 'block';
+  box.textContent = 'A consultar...';
+  const r = await dbCall('diagnostico', {});
+  if (!r) { box.textContent = '❌ Sem resposta.'; return; }
+  if (r.ok === false) { box.textContent = '⚠️ ' + r.error; return; }
+  const loc = k => { try { return JSON.parse(localStorage.getItem(k) || '[]').length; } catch (e) { return 0; } };
+  box.textContent =
+    `Script versão: ${r.versao}\nSheet: ${r.planilha}\n\n` +
+    `Folhas:\n` +
+    Object.keys(r.contagens).map(k => `  ${k}: ${r.contagens[k]}`).join('\n') +
+    `\n\nNeste dispositivo: ${loc('cotacoes')} cotações · ${loc('clientes')} clientes · ${loc('produtos')} produtos · ${loc('documentos')} documentos · ${loc('movstock')} movimentos`;
 }
+async function ligarBaseDados() {
+  if (_dbUrlVisivel) {
+    const url = gv('cfg-db-url').trim();
+    if (!url) { showToast('⚠️ URL vazio.'); return; }
+    setDbUrl(url);
+    _dbUrlVisivel = false;
+    document.getElementById('cfg-db-url').readOnly = true;
+    document.getElementById('cfg-db-url').value = mascararUrl(url);
+    document.getElementById('cfg-db-url').style.background = '#f6f8fc';
+    document.getElementById('btn-edit-db').textContent = 'Alterar';
+  }
+  if (!getDbUrl()) { showToast('⚠️ Defina primeiro o URL.'); return; }
+  showToast('🔌 A testar ligação...');
+  const r = await dbCall('ping', {});
+  if (r && r.ok) {
+    showToast('Ligado à Base de Dados!');
+    setConnStatus('ok', 'Ligado');
+    if (SESSAO) await sincronizarTudo();
+  } else showToast('❌ Falha ao ligar.');
+}
+
+/* ───────────── CLIENTES ───────────── */
+function getClientes() { try { return JSON.parse(localStorage.getItem('clientes') || '[]'); } catch (e) { return []; } }
 function setClientes(a) { localStorage.setItem('clientes', JSON.stringify(a)); }
 
 function registarClienteAuto(dados) {
@@ -1791,9 +1642,7 @@ function registarClienteAuto(dados) {
   };
   if (cli) {
     let alterou = false;
-    campos.forEach(c => {
-      if (!cli[c] && novos[c]) { cli[c] = novos[c]; alterou = true; }
-    });
+    campos.forEach(c => { if (!cli[c] && novos[c]) { cli[c] = novos[c]; alterou = true; } });
     if (alterou) {
       cli.atualizadoEm = agora;
       setClientes(lista);
@@ -1804,8 +1653,7 @@ function registarClienteAuto(dados) {
   }
   const novo = {
     id: Date.now() + Math.floor(Math.random() * 1000),
-    nome: nome,
-    nuit: novos.nuit, end: novos.end, cidade: novos.cidade, tel: novos.tel, email: novos.email,
+    nome, nuit: novos.nuit, end: novos.end, cidade: novos.cidade, tel: novos.tel, email: novos.email,
     criadoEm: agora, atualizadoEm: agora, criadoAuto: 'sim'
   };
   lista.unshift(novo);
@@ -1823,8 +1671,7 @@ function guardarClienteDoForm() {
   const agora = new Date().toISOString();
   let cli = lista.find(c => String(c.nome || '').trim().toLowerCase() === key);
   const dados = {
-    nome: nome,
-    nuit: gv('cli-nuit').trim(), end: gv('cli-end').trim(),
+    nome, nuit: gv('cli-nuit').trim(), end: gv('cli-end').trim(),
     cidade: gv('cli-cidade').trim(), tel: gv('cli-tel').trim(), email: gv('cli-email').trim()
   };
   if (cli) {
@@ -1840,15 +1687,13 @@ function guardarClienteDoForm() {
   if (temDB()) dbCall('saveCliente', { cliente: cli });
 }
 
-function carregarClientes() { renderClientes(); }
-
 function renderClientes() {
   const wrap = document.getElementById('cli-list-wrap');
   const stats = document.getElementById('cli-stats');
   if (!wrap) return;
   let lista = getClientes();
   if (!lista.length) {
-    wrap.innerHTML = `<div class="empty-state"><div class="big">${ICONS.clientes}</div><p style="font-size:14px;font-weight:600">Ainda não tem clientes</p><p style="margin-top:6px;font-size:12px">Os clientes são registados automaticamente quando guarda uma cotação ou emite um documento. Também pode adicionar manualmente.</p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><div class="big">${ICONS.clientes}</div><p style="font-size:14px;font-weight:600">Ainda não tem clientes</p><p style="margin-top:6px;font-size:12px">Os clientes são registados automaticamente quando guarda uma cotação ou emite um documento.</p></div>`;
     if (stats) stats.textContent = '';
     return;
   }
@@ -1918,8 +1763,7 @@ function salvarClienteEdit() {
   const lista = getClientes();
   const agora = new Date().toISOString();
   const dados = {
-    nome: nome,
-    nuit: document.getElementById('cliedit-nuit').value.trim(),
+    nome, nuit: document.getElementById('cliedit-nuit').value.trim(),
     tel: document.getElementById('cliedit-tel').value.trim(),
     end: document.getElementById('cliedit-end').value.trim(),
     cidade: document.getElementById('cliedit-cidade').value.trim(),
@@ -2002,7 +1846,7 @@ function renderModalClientes() {
   if (q) lista = lista.filter(c => ((c.nome||'')+(c.nuit||'')+(c.tel||'')+(c.cidade||'')).toLowerCase().includes(q));
   const wrap = document.getElementById('modal-cli-list');
   if (!lista.length) {
-    wrap.innerHTML = '<p style="text-align:center;color:var(--muted);padding:16px">Nenhum cliente encontrado. Crie um na aba Clientes.</p>';
+    wrap.innerHTML = '<p style="text-align:center;color:var(--muted);padding:16px">Nenhum cliente encontrado.</p>';
     return;
   }
   wrap.innerHTML = '<div class="modal-item-grid">' + lista.map(c => `
@@ -2024,7 +1868,7 @@ function selecionarCliente(id) {
   fecharModal();
 }
 
-/* ════════ PRODUTOS E STOCK ════════ */
+/* ───────────── PRODUTOS ───────────── */
 function getProdutos() { return JSON.parse(localStorage.getItem('produtos')||'[]'); }
 function setProdutos(p) { localStorage.setItem('produtos', JSON.stringify(p)); }
 function getMovs() { try { return JSON.parse(localStorage.getItem('movstock') || '[]'); } catch (e) { return []; } }
@@ -2094,7 +1938,7 @@ async function confirmarMovStock() {
   setProdutos(prods);
   const movs = getMovs(); movs.unshift(mov); setMovs(movs);
   registarLog('STOCK_' + tipo, 'Produto', p.ref || p.desc, `${delta>0?'+':''}${delta} · ${antes} → ${depois}`);
-  if (temDB()) { await dbCall('saveMovStock', { movimento: mov }); }
+  if (temDB()) { await dbCall('saveMovStock', { movimento: mov }); await dbCall('saveProduto', { produto: p }); }
   fecharModal();
   showToast(`Stock: ${fmt(antes)} → ${fmt(depois)}`);
   renderProdList();
@@ -2160,7 +2004,7 @@ function filtrarProdList(q) {
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-weight:700;color:var(--blue)">${esc(p.ref)||'—'}</div>
           <div style="font-size:13px;font-weight:700;margin:2px 0">${esc(p.desc)||'—'}</div>
-          <div style="font-size:11px;color:var(--muted)">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%${p.pcompra===''||p.pcompra==null?'':' · Compra '+fmt(p.pcompra)}</div>
+          <div style="font-size:11px;color:var(--muted)">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%</div>
           <div style="font-size:11.5px;margin-top:4px">Stock: ${stTag}${min>0?` <span style="color:var(--muted);font-size:10.5px">(mín: ${fmt(min)})</span>`:''}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;margin-left:8px">
@@ -2176,7 +2020,7 @@ function abrirModalNovoProduto() {
   document.getElementById('modal-prod-titulo').textContent = 'Novo Produto';
   document.getElementById('prod-edit-id').value = '';
   ['prod-ref','prod-desc'].forEach(f=>document.getElementById(f).value='');
-  document.getElementById('prod-pu').value = ''; document.getElementById('prod-pc').value = '';
+  document.getElementById('prod-pu').value = '';
   document.getElementById('prod-un').value = 'Un';
   document.getElementById('prod-iva').value = '16';
   document.getElementById('prod-stock').value = '0';
@@ -2191,7 +2035,7 @@ function editarProduto(id) {
   document.getElementById('prod-edit-id').value = id;
   document.getElementById('prod-ref').value = p.ref||'';
   document.getElementById('prod-desc').value = p.desc||'';
-  document.getElementById('prod-pu').value = p.pu||0; document.getElementById('prod-pc').value = (p.pcompra===''||p.pcompra==null) ? '' : p.pcompra;
+  document.getElementById('prod-pu').value = p.pu||0;
   document.getElementById('prod-un').value = p.un||'Un';
   document.getElementById('prod-iva').value = p.iva||16;
   document.getElementById('prod-stock').value = (+p.stock || 0);
@@ -2205,7 +2049,7 @@ function salvarProduto() {
   if (!ref && !desc) { showToast('⚠️ Preencha ref. ou descrição.'); return; }
   let prods = getProdutos();
   const editId = document.getElementById('prod-edit-id').value;
-  const stNovo = Math.max(0, parseFloat(document.getElementById('prod-stock').value) || 0);
+  const stNovo = parseFloat(document.getElementById('prod-stock').value) || 0;
   const anterior = editId ? prods.find(p => p.id === +editId) : null;
   const stAntes = anterior ? (+anterior.stock || 0) : 0;
   const prod = {
@@ -2214,7 +2058,6 @@ function salvarProduto() {
     un:  document.getElementById('prod-un').value,
     pu:  parseFloat(document.getElementById('prod-pu').value)||0,
     iva: parseInt(document.getElementById('prod-iva').value)||16,
-    pcompra: document.getElementById('prod-pc').value === '' ? '' : Math.max(0, parseFloat(document.getElementById('prod-pc').value) || 0),
     stock: stNovo,
     stockMin: parseFloat(document.getElementById('prod-stockmin').value) || 0,
     rastrear: document.getElementById('prod-rastrear').checked ? 'sim' : 'nao',
@@ -2224,7 +2067,6 @@ function salvarProduto() {
   else prods.unshift(prod);
   setProdutos(prods);
   registarLog(editId ? 'PROD_EDITAR' : 'PROD_CRIAR', 'Produto', ref || desc, `${desc} · Stock ${fmt(prod.stock)}`);
-  if (temDB()) dbCall('saveProduto', { produto: (!anterior && stNovo > 0) ? Object.assign({}, prod, { stock: 0 }) : prod });
   if (!anterior && stNovo > 0) {
     const mov = { id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
       produtoId: prod.id, produtoRef: prod.ref, produtoDesc: prod.desc, tipo: 'INICIAL',
@@ -2242,6 +2084,7 @@ function salvarProduto() {
   fecharModal();
   renderProdList();
   showToast('Produto guardado!');
+  if (temDB()) dbCall('saveProduto', { produto: prod });
 }
 function apagarProduto(id) {
   if (!confirm('Apagar este produto?')) return;
@@ -2281,7 +2124,7 @@ function selecionarProduto(prodId) {
   renderItems();
 }
 
-/* ════════ VALIDAÇÃO DE STOCK ════════ */
+/* ───────────── VALIDAÇÃO DE STOCK ───────────── */
 function verificarStockItens(itensArr) {
   const prods = getProdutos();
   const erros = [];
@@ -2304,7 +2147,7 @@ function htmlAlertaStock(erros) {
   </div>`;
 }
 
-/* ════════ GUARDAR COTAÇÃO ════════ */
+/* ───────────── GUARDAR COTAÇÃO ───────────── */
 function validarCotacao() {
   const erros = [], avisos = [];
   const comDesc = items.filter(it => String(it.desc || '').trim());
@@ -2371,7 +2214,11 @@ function confirmarGuardar() {
   registarLog(anterior ? 'COT_EDITAR' : 'COT_CRIAR', 'Cotação', num, `Cliente: ${cot.cliNome || '—'} · Total ${fmt(cot.total)} ${cot.moeda}`);
   fecharModal();
   showToast('Cotação '+num+' guardada!');
-  if (temDB()) dbCall('saveCotacao', { cotacao: cot }).then(r => { if (r && r.ok) setDbStatus(true, 'Cotação sincronizada.'); });
+  if (temDB()) {
+    dbCall('saveCotacao', { cotacao: cot }).then(r => {
+      if (r && r.ok) setTimeout(sincronizarTudo, 300);
+    });
+  }
 }
 function renderCotList() {
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
@@ -2412,7 +2259,7 @@ function carregarCotacao(num) {
   escolherTipoDoc('COT');
   switchTab('cotacao');
 }
-function previewCotacao(num) { carregarCotacao(num); switchTab('preview'); }
+function previewCotacao(num) { carregarCotacao(num); _docPreview = null; switchTab('preview'); }
 function apagarCotacao(num) {
   if (!pode('apagarCot')) { showToast('⛔ Sem permissão.'); return; }
   if (!confirm('Apagar a cotação '+num+'?')) return;
@@ -2420,7 +2267,7 @@ function apagarCotacao(num) {
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]').filter(c=>c.num!==num);
   localStorage.setItem('cotacoes', JSON.stringify(cots));
   renderCotList();
-  if (temDB()) dbCall('deleteCotacao', { num });
+  if (temDB()) dbCall('deleteCotacao', { num }).then(() => setTimeout(sincronizarTudo, 300));
   if (gv('cot-num').trim() === num) { limparFormSilencioso(); limparPreview(); }
 }
 async function apagarTodasCotacoes() {
@@ -2434,8 +2281,10 @@ async function apagarTodasCotacoes() {
   renderCotList();
   limparFormSilencioso();
   limparPreview();
-  showToast('A apagar...');
-  if (temDB()) { for (const c of cots) await dbCall('deleteCotacao', { num: c.num }); }
+  if (temDB()) {
+    for (const c of cots) await dbCall('deleteCotacao', { num: c.num });
+    setTimeout(sincronizarTudo, 300);
+  }
   showToast('Todas apagadas.');
 }
 function limparPreview() {
@@ -2443,7 +2292,7 @@ function limparPreview() {
   if (wrap) wrap.innerHTML = `<div class="empty-state"><div class="big">${ICONS.eye}</div><p style="font-size:14px;font-weight:600">Nada para mostrar</p></div>`;
 }
 
-/* ════════ DOCUMENTOS ════════ */
+/* ───────────── DOCUMENTOS ───────────── */
 const TIPOS_DOC = {
   COT: { nome: 'Cotação',          titulo: 'COTAÇÃO' },
   FT:  { nome: 'Factura',          titulo: 'FACTURA',          pref: 'FT ', seq: 'ftSeq', cfg: 'cfg-prefix-ft' },
@@ -2482,14 +2331,23 @@ function guardarDoc(doc, movs) {
   const i = docs.findIndex(x => x.id === doc.id);
   if (i >= 0) docs[i] = doc; else docs.unshift(doc);
   setDocs(docs);
-  if (temDB()) dbCall('saveDocumento', { documento: doc, movimentos: movs || [] }).then(r => { if (r && r.ok) setDbStatus(true, 'Documento sincronizado.'); });
+  if (temDB()) dbCall('saveDocumento', { documento: doc, movimentos: movs || [] });
 }
 function normDoc(x) {
   const o = Object.assign({}, x);
   NUM_DOC_CAMPOS.forEach(k => { o[k] = +o[k] || 0; });
   o.items = Array.isArray(o.items) ? o.items : [];
-  ['obs','metodo','origem','facturaId','estado','cond','venc','tempo','validade'].forEach(k => { if (o[k] == null) o[k] = ''; });
+  ['obs','metodo','origem','facturaId','estado','cond','venc'].forEach(k => { if (o[k] == null) o[k] = ''; });
   return o;
+}
+function mesclarDocumentos(remotos) {
+  const mapa = {};
+  remotos.forEach(x => { const o = normDoc(x); if (o.id) mapa[o.id] = o; });
+  getDocs().forEach(l => {
+    const r = mapa[l.id];
+    if (!r || (l.atualizadoEm || '') > (r.atualizadoEm || '')) mapa[l.id] = l;
+  });
+  setDocs(Object.values(mapa).sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || ''))));
 }
 function prefixoDoc(tipo) { const v = localStorage.getItem(TIPOS_DOC[tipo].cfg); return (v === null || v === '') ? TIPOS_DOC[tipo].pref : v; }
 function seqMaximoDoc(tipo) {
@@ -2500,7 +2358,7 @@ function seqMaximoDoc(tipo) {
 function registarSeqDoc(tipo, n) {
   const k = TIPOS_DOC[tipo].seq;
   const atual = parseInt(localStorage.getItem(k) || 0) || 0;
-  if (n > atual) localStorage.setItem(k, n);
+  if (n > atual) { localStorage.setItem(k, n); if (temDB()) dbCall('saveConfig', { config: { [k]: String(n) } }); }
 }
 function proximoNumDoc(tipo) {
   const h = new Date();
@@ -2553,7 +2411,7 @@ function abrirEmitir(tipo, ref) {
   if (errosStock.length) {
     alert('Stock insuficiente:\n\n' + errosStock.map(e =>
       `• ${e.ref} ${e.desc}\n   Precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)} (faltam ${fmt(e.falta)})`
-    ).join('\n\n') + '\n\nVá a Produtos → Movimento para repor.\n\nNota: Cotações não têm esta restrição.');
+    ).join('\n\n') + '\n\nVá a Produtos → Movimento para repor.');
     return;
   }
   if (cot.origem) {
@@ -2563,8 +2421,7 @@ function abrirEmitir(tipo, ref) {
   _emitir = { tipo, cot };
   document.getElementById('em-titulo').textContent = tipo === 'FT' ? 'Emitir Factura' : 'Emitir Venda a Dinheiro';
   document.getElementById('em-info').textContent = `${cot.origem ? 'Cotação ' + cot.origem : 'Do formulário'} · Cliente: ${cot.cliNome || '—'} · Total: ${fmt(cot.total)} ${cot.moeda || 'MT'}`;
-  document.getElementById('em-num').value = proximoNumDoc(tipo); document.getElementById('em-num').readOnly = temDB();
-  if (temDB()) document.getElementById('em-info').textContent += ' · Nº definitivo atribuído pelo servidor';
+  document.getElementById('em-num').value = proximoNumDoc(tipo);
   document.getElementById('em-data').value = hojeISO();
   _vencManual = false;
   recalcVencEmitir();
@@ -2574,71 +2431,54 @@ function abrirEmitir(tipo, ref) {
   document.getElementById('em-stock-alerta').innerHTML = '';
   document.getElementById('modal-emitir').classList.add('open');
 }
-function movsStock(doc, sinal, tipo, motivo) {
-  const prods = getProdutos(), movs = [], agora = new Date().toISOString();
-  (doc.items || []).forEach(it => {
-    const p = prods.find(x => String(x.ref||'') === String(it.ref||'') && String(x.desc||'') === String(it.desc||''));
-    if (!p || p.rastrear === 'nao') return;
-    const antes = +p.stock || 0, q = sinal * (+it.qtd || 0), depois = Math.max(0, round2(antes + q));
-    movs.push({ id: novoUid(), ts: agora, user: (SESSAO && SESSAO.username) || '', produtoId: p.id, produtoRef: p.ref||'', produtoDesc: p.desc||'',
-      tipo, qtd: q, qtdAntes: antes, qtdDepois: depois, motivo, refDoc: doc.id, obs: '', origem: 'app' });
-    p.stock = depois; p.stockAtualizadoEm = agora;
-  });
-  if (movs.length) { setProdutos(prods); setMovs(movs.concat(getMovs())); }
-  return movs;
-}
-/* Com BD: o servidor atribui o número, valida o stock e grava de imediato (tudo sob bloqueio, sem corridas entre utilizadores) */
-async function emitirDoc(tipo, doc) {
-  if (temDB()) {
-    const r = await dbCallRaw('emitirDocumento', { tipo, prefixo: prefixoDoc(tipo), documento: doc });
-    if (!r) { showToast('⛔ Sem ligação: a emissão exige ligação à Base de Dados.'); return null; }
-    if (!r.ok) {
-      const el = document.getElementById('em-stock-alerta');
-      if (el) el.innerHTML = r.code === 'STOCK' ? htmlAlertaStock(r.erros || []) : '';
-      if (r.code === 'STOCK' && Array.isArray(r.produtos)) setProdutos(r.produtos.map(normProd));
-      showToast('⛔ ' + (r.error || 'Falha ao emitir.'));
-      return null;
-    }
-    const d = normDoc(r.documento);
-    setDocs([d].concat(getDocs().filter(x => x.id !== d.id)));
-    if (Array.isArray(r.produtos)) setProdutos(r.produtos.map(normProd));
-    const k = TIPOS_DOC[tipo].seq;
-    if (seqDeNum(d.num) > (parseInt(localStorage.getItem(k) || 0) || 0)) localStorage.setItem(k, seqDeNum(d.num));
-    return d;
-  }
-  const movs = tipo === 'RC' ? [] : movsStock(doc, -1, 'VENDA', `${doc.tipo} ${doc.num}`);
-  movs.forEach(m => registarLog('STOCK_VENDA', 'Produto', m.produtoRef, `${m.qtd} · ${m.qtdAntes} → ${m.qtdDepois}`));
-  guardarDoc(doc, movs);
-  registarSeqDoc(tipo, seqDeNum(doc.num));
-  return doc;
-}
-async function confirmarEmitir() {
+function confirmarEmitir() {
   if (!_emitir) return;
-  const { tipo, cot } = _emitir, online = temDB(), num = gv('em-num').trim();
-  if (!online && !num) { showToast('⚠️ Indique o número.'); return; }
-  if (!online && getDocs().some(x => x.id === docId(tipo, num))) { showToast('⚠️ Já existe documento com este número.'); return; }
+  const { tipo, cot } = _emitir;
+  const num = gv('em-num').trim();
+  if (!num) { showToast('⚠️ Indique o número.'); return; }
+  const id = docId(tipo, num);
+  if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe documento com este número.'); return; }
   const errosStock = verificarStockItens(cot.items);
   if (errosStock.length) { document.getElementById('em-stock-alerta').innerHTML = htmlAlertaStock(errosStock); showToast('⛔ Stock insuficiente.'); return; }
-  const total = +cot.total || 0, vd = tipo === 'VD';
+  const total = +cot.total || 0;
   const doc = normDoc({
-    id: docId(tipo, num), tipo, num, data: gv('em-data') || hojeISO(), venc: tipo === 'FT' ? gv('em-venc') : '',
-    moeda: cot.moeda || 'MT', cond: vd ? 'Pronto Pagamento' : (cot.cond || ''), tempo: cot.tempo || '', validade: cot.validade || '',
-    metodo: vd ? gv('em-metodo') : '', origem: cot.origem || '', obs: gv('em-obs'), estado: 'Emitido',
-    cliNome: cot.cliNome || (vd ? 'Consumidor Final' : ''), cliNuit: cot.cliNuit || '', cliEnd: cot.cliEnd || '',
+    id, tipo, num, data: gv('em-data') || hojeISO(), venc: tipo === 'FT' ? gv('em-venc') : '',
+    moeda: cot.moeda || 'MT', cond: tipo === 'VD' ? 'Pronto Pagamento' : (cot.cond || ''),
+    metodo: tipo === 'VD' ? gv('em-metodo') : '', origem: cot.origem || '', obs: gv('em-obs'), estado: 'Emitido',
+    cliNome: cot.cliNome || (tipo === 'VD' ? 'Consumidor Final' : ''), cliNuit: cot.cliNuit || '', cliEnd: cot.cliEnd || '',
     cliCidade: cot.cliCidade || '', cliTel: cot.cliTel || '', cliEmail: cot.cliEmail || '',
     items: JSON.parse(JSON.stringify(cot.items || [])),
     sub: cot.sub, descTipo: cot.descTipo || 'pct', descValor: cot.descValor, desconto: cot.desconto, iva: cot.iva, total,
-    valorRecebido: vd ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
+    valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
-  const btn = document.getElementById('em-btn-emitir'); btn.disabled = true;
-  const d = await emitirDoc(tipo, doc);
-  btn.disabled = false;
-  if (!d) return;
-  if (tipo === 'FT' && d.cliNome && d.cliNome.trim()) registarClienteAuto(d);
-  registarLog('DOC_EMITIR', TIPOS_DOC[tipo].nome, d.num, `Cliente: ${d.cliNome || '—'} · Total ${fmt(d.total)} ${d.moeda}`);
-  fecharModal(); _emitir = null;
-  showToast(`${TIPOS_DOC[tipo].nome} ${d.num} emitida${online ? ' e gravada online' : ''}.`);
-  escolherTipoDoc('COT'); switchTab('documentos');
+  const movsStock = [];
+  const prods = getProdutos();
+  (doc.items || []).forEach(it => {
+    const p = prods.find(x => String(x.ref||'') === String(it.ref||'') && String(x.desc||'') === String(it.desc||''));
+    if (!p || p.rastrear === 'nao') return;
+    const antes = +p.stock || 0;
+    const depois = round2(antes - (+it.qtd || 0));
+    movsStock.push({ id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
+      produtoId: p.id, produtoRef: p.ref||'', produtoDesc: p.desc||'',
+      tipo: 'VENDA', qtd: -(+it.qtd || 0), qtdAntes: antes, qtdDepois: depois,
+      motivo: `${doc.tipo} ${doc.num}`, refDoc: doc.id, obs: '', origem: 'app' });
+    p.stock = depois; p.stockAtualizadoEm = new Date().toISOString();
+  });
+  if (movsStock.length) {
+    setProdutos(prods);
+    const ms = getMovs(); setMovs(movsStock.concat(ms));
+    movsStock.forEach(m => registarLog('STOCK_VENDA', 'Produto', m.produtoRef, `${m.qtd} · ${m.qtdAntes} → ${m.qtdDepois}`));
+  }
+  guardarDoc(doc, movsStock);
+  if (tipo === 'FT' && doc.cliNome && doc.cliNome.trim()) registarClienteAuto(doc);
+  registarLog('DOC_EMITIR', TIPOS_DOC[tipo].nome, num, `Cliente: ${doc.cliNome || '—'} · Total ${fmt(doc.total)} ${doc.moeda}`);
+  registarSeqDoc(tipo, seqDeNum(num));
+  fecharModal();
+  _emitir = null;
+  showToast(`${TIPOS_DOC[tipo].nome} ${num} emitida.${movsStock.length ? ' Stock actualizado.' : ''}`);
+  escolherTipoDoc('COT');
+  switchTab('documentos');
+  setTimeout(sincronizarTudo, 500);
 }
 let _reciboDe = null;
 function abrirRecibo(idEnc) {
@@ -2649,35 +2489,38 @@ function abrirRecibo(idEnc) {
   if (inf.saldo <= 0.005) { showToast('Factura já paga.'); return; }
   _reciboDe = f;
   document.getElementById('rc-info').textContent = `Factura ${f.num} · ${f.cliNome || '—'} · Total ${fmt(f.total)} · Recebido ${fmt(inf.pago)} · Saldo ${fmt(inf.saldo)} ${f.moeda}`;
-  document.getElementById('rc-num').value = proximoNumDoc('RC'); document.getElementById('rc-num').readOnly = temDB();
+  document.getElementById('rc-num').value = proximoNumDoc('RC');
   document.getElementById('rc-data').value = hojeISO();
   document.getElementById('rc-valor').value = inf.saldo.toFixed(2);
   document.getElementById('rc-obs').value = '';
   document.getElementById('modal-recibo').classList.add('open');
 }
-async function confirmarRecibo() {
+function confirmarRecibo() {
   const f = _reciboDe; if (!f) return;
-  const online = temDB(), num = gv('rc-num').trim();
-  if (!online && !num) { showToast('⚠️ Indique o número.'); return; }
-  if (!online && getDocs().some(x => x.id === docId('RC', num))) { showToast('⚠️ Já existe recibo com este número.'); return; }
+  const num = gv('rc-num').trim();
+  if (!num) { showToast('⚠️ Indique o número.'); return; }
+  const id = docId('RC', num);
+  if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe recibo com este número.'); return; }
   const inf = infoDoc(getDocs().find(x => x.id === f.id) || f, pagosPorFactura());
   const valor = round2(parseFloat(gv('rc-valor')));
   if (!(valor > 0)) { showToast('⚠️ Indique o valor.'); return; }
   if (valor > inf.saldo + 0.005) { showToast(`⚠️ Valor excede saldo (${fmt(inf.saldo)}).`); return; }
   const doc = normDoc({
-    id: docId('RC', num), tipo: 'RC', num, data: gv('rc-data') || hojeISO(), moeda: f.moeda, metodo: gv('rc-metodo'), obs: gv('rc-obs'),
+    id, tipo: 'RC', num, data: gv('rc-data') || hojeISO(), moeda: f.moeda, metodo: gv('rc-metodo'), obs: gv('rc-obs'),
     estado: 'Emitido', origem: f.num, facturaId: f.id,
     cliNome: f.cliNome, cliNuit: f.cliNuit, cliEnd: f.cliEnd, cliCidade: f.cliCidade, cliTel: f.cliTel, cliEmail: f.cliEmail,
     items: [], sub: 0, descTipo: 'pct', descValor: 0, desconto: 0, iva: 0, total: valor, valorRecebido: valor,
-    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(),
-    criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
+    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
-  const d = await emitirDoc('RC', doc);
-  if (!d) return;
-  registarLog('DOC_RECIBO', 'Recibo', d.num, `Factura ${f.num} · Recebido ${fmt(valor)} ${f.moeda} · Saldo ${fmt(d.saldoApos)}`);
-  fecharModal(); _reciboDe = null;
-  showToast(`Recibo ${d.num} emitido. Saldo: ${fmt(d.saldoApos)} ${f.moeda}`);
-  escolherTipoDoc('COT'); renderDocList();
+  guardarDoc(doc);
+  registarLog('DOC_RECIBO', 'Recibo', num, `Factura ${f.num} · Recebido ${fmt(valor)} ${f.moeda} · Saldo ${fmt(doc.saldoApos)}`);
+  registarSeqDoc('RC', seqDeNum(num));
+  fecharModal();
+  _reciboDe = null;
+  showToast(`Recibo ${num} emitido. Saldo: ${fmt(doc.saldoApos)} ${f.moeda}`);
+  escolherTipoDoc('COT');
+  renderDocList();
+  setTimeout(sincronizarTudo, 500);
 }
 function previewDoc(idEnc) {
   const d = getDocs().find(x => x.id === decodeURIComponent(idEnc));
@@ -2685,7 +2528,6 @@ function previewDoc(idEnc) {
   _docPreview = d;
   switchTab('preview');
 }
-function movsStock_(d) { return movsStock(d, +1, 'ANULACAO', 'Anulação ' + d.tipo + ' ' + d.num); }
 function anularDoc(idEnc) {
   if (!pode('anular')) { showToast('⛔ Só master/admin.'); return; }
   const docs = getDocs();
@@ -2694,11 +2536,27 @@ function anularDoc(idEnc) {
   if (d.tipo === 'FT' && docs.some(r => r.tipo === 'RC' && r.facturaId === d.id && r.estado !== 'Anulado')) { alert('Esta factura tem recibos. Anule primeiro os recibos.'); return; }
   if (!confirm(`Anular ${TIPOS_DOC[d.tipo].nome} ${d.num}?`)) return;
   d.estado = 'Anulado'; d.anuladoEm = new Date().toISOString();
-  const movsStock = (d.tipo === 'FT' || d.tipo === 'VD') ? movsStock_(d) : [];
+  const movsStock = [];
+  if (d.tipo === 'FT' || d.tipo === 'VD') {
+    const prods = getProdutos();
+    (d.items || []).forEach(it => {
+      const p = prods.find(x => String(x.ref||'') === String(it.ref||'') && String(x.desc||'') === String(it.desc||''));
+      if (!p || p.rastrear === 'nao') return;
+      const antes = +p.stock || 0;
+      const depois = round2(antes + (+it.qtd || 0));
+      movsStock.push({ id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
+        produtoId: p.id, produtoRef: p.ref||'', produtoDesc: p.desc||'',
+        tipo: 'ANULACAO', qtd: +(+it.qtd || 0), qtdAntes: antes, qtdDepois: depois,
+        motivo: 'Anulação ' + d.tipo + ' ' + d.num, refDoc: d.id, obs: '', origem: 'app' });
+      p.stock = depois; p.stockAtualizadoEm = new Date().toISOString();
+    });
+    if (movsStock.length) { setProdutos(prods); const ms = getMovs(); setMovs(movsStock.concat(ms)); }
+  }
   guardarDoc(d, movsStock);
   registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, 'Total ' + fmt(d.total) + (movsStock.length ? ' · stock reposto' : ''));
   renderDocList();
   showToast('Documento anulado.' + (movsStock.length ? ' Stock reposto.' : ''));
+  setTimeout(sincronizarTudo, 500);
 }
 function renderDocList() {
   const wrap = document.getElementById('doc-list-wrap');
@@ -2736,7 +2594,7 @@ function renderDocList() {
   }).join('') + '</div>';
 }
 
-/* ════════ BUILD DOC ════════ */
+/* ───────────── BUILD DOC ───────────── */
 let _docPreview = null;
 function gerarPreview() { document.getElementById('cot-preview').innerHTML = buildDoc(_docPreview || undefined); }
 function buildDoc(d) {
@@ -2748,8 +2606,7 @@ function buildDoc(d) {
   const empNuit = lsv('emp-nuit'), empEnd = lsv('emp-end'), empTel = lsv('emp-tel'), empEmail = lsv('emp-email'), empCidade = lsv('emp-cidade');
   const cliNome = d.cliNome || '—', cliNuit = d.cliNuit || '', cliEnd = d.cliEnd || '', cliCidade = d.cliCidade || '', cliTel = d.cliTel || '', cliEmail = d.cliEmail || '';
   const cotNum = d.num || '', cotData = fmtDate(d.data), cotVenc = fmtDate(d.venc);
-  const oc = (d.tipo && d.tipo !== 'COT' && d.origem) ? (cotGuardada(d.origem) || {}) : {};
-  const cotCond = d.cond || 'Pronto Pagamento', cotTempo = d.tempo || oc.tempo || 'Entrega imediata', cotVal = d.validade || oc.validade || '15';
+  const cotCond = d.cond || 'Pronto Pagamento', cotTempo = d.tempo || 'Entrega imediata', cotVal = d.validade || '15';
   const moeda = d.moeda || 'MT', rodape = lsv('cfg-rodape') || 'Documento Processado por Computador';
   const cotObs = String(d.obs || '').trim(), itens = d.items || [];
   const descTipo = d.descTipo || 'pct', descValor = parseFloat(d.descValor) || 0;
@@ -2765,9 +2622,9 @@ function buildDoc(d) {
   const extensoHTML = valorPorExtenso(total, moeda);
   const tp = d.tipo || 'COT';
   const par = (l, v) => `<div><span style="color:#555">${l}: </span><span style="font-weight:600">${v}</span></div>`;
-  let vencInfo = (() => {
+  const vencInfo = (() => {
     let venc = d.venc;
-    if (!venc && d.data && cotVal) { const x = new Date(d.data + 'T00:00:00'); x.setDate(x.getDate() + (+cotVal || 0)); venc = dataLocalISO(x); }
+    if (!venc && d.data && d.validade) { const x = new Date(d.data + 'T00:00:00'); x.setDate(x.getDate() + (+d.validade || 0)); venc = dataLocalISO(x); }
     if (!venc) return '—';
     let vencido = String(venc).slice(0, 10) < hojeISO();
     if (d.tipo === 'FT') vencido = vencido && d.estado !== 'Anulado' && infoDoc(d, pagosPorFactura()).saldo > 0.005;
@@ -2776,12 +2633,18 @@ function buildDoc(d) {
   const nReimp = +d.impressoes || 0;
   const agoraTxt = (() => { const n = new Date(); return fmtDate(dataLocalISO(n)) + ' ' + String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); })();
   let metaBase, condTitulo = 'Condições', condHTML;
-  /* Mesmo layout para COT, FT e VD; FT/VD acrescentam só a referência (e o pagamento na VD) */
-  if (tp === 'VD') vencInfo = cotData;
-  metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Vencimento',vencInfo],['Validade',cotVal+' dias'],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
-  condHTML = par('Tempo de execução', esc(cotTempo)) + par('Validade da cotação', cotVal+' dias') + par('Cond. de pagamento', esc(cotCond));
-  if (tp !== 'COT') condHTML += par('Ref. cotação', esc(d.origem||'—'));
-  if (tp === 'VD') condHTML += par('Método de pagamento', esc(d.metodo||'—')) + par('Valor recebido', fmt(total)+' '+moeda);
+  if (tp === 'FT') {
+    metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Data',cotData],['Vencimento',vencInfo],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
+    condTitulo = 'Dados da Factura';
+    condHTML = par('Cond. de pagamento', esc(cotCond)) + par('Vencimento', vencInfo) + par('Ref. cotação', esc(d.origem||'—'));
+  } else if (tp === 'VD') {
+    metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Data',cotData],['Pagamento',esc(d.metodo||'—')],['Ref. Cotação',esc(d.origem||'—')],['Moeda',moeda]];
+    condTitulo = 'Dados do Pagamento';
+    condHTML = par('Método de pagamento', esc(d.metodo||'—')) + par('Valor recebido', fmt(total)+' '+moeda) + par('Ref. cotação', esc(d.origem||'—'));
+  } else {
+    metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Vencimento',vencInfo],['Validade',cotVal+' dias'],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
+    condHTML = par('Tempo de execução', esc(cotTempo)) + par('Validade da cotação', cotVal+' dias') + par('Cond. de pagamento', esc(cotCond));
+  }
   const htmlTopo = `  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5mm;padding-bottom:4mm;border-bottom:2.5px solid ${cor}">
     <div>${logoHTML}</div>
     <div style="text-align:right">
@@ -2907,7 +2770,12 @@ function numExtenso(n) {
   const un = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','catorze','quinze','dezasseis','dezassete','dezoito','dezanove'];
   const dez = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
   const cen = ['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
-  const simples = r => r < 1000 ? (r < 100 || r % 100 === 0) : r % 1000 === 0 && r < 1000000 ? simples(r / 1000) : r % 1000000 === 0 ? simples(r / 1000000) : false;
+  const simples = r => {
+    if (r < 100) return true;
+    if (r < 1000) return r % 100 === 0;
+    if (r < 1000000) return r % 1000 === 0;
+    return r % 1000000 === 0;
+  };
   const liga = r => (simples(r) ? ' e ' : ' ') + numExtenso(r);
   if (n < 20) return un[n];
   if (n < 100) return dez[Math.floor(n/10)] + (n%10 ? ' e '+un[n%10] : '');
@@ -3022,7 +2890,7 @@ function showToast(msg) {
   t._t=setTimeout(()=>{ t.style.opacity='0'; }, 3000);
 }
 
-/* ════════ BUILD RECIBO ════════ */
+/* ───────────── BUILD RECIBO ───────────── */
 function buildRecibo(d) {
   const cor = document.getElementById('cfg-cor').value || '#1a4fa0';
   const empNome = lsv('emp-nome') || 'Empresa Emissora';
@@ -3080,7 +2948,7 @@ function buildRecibo(d) {
   return `<div class="cot-pages"><div class="cot-doc cot-page"><div class="cot-doc-body">${topo}</div>${rod}</div></div>`;
 }
 
-/* ════════ RESUMOS ════════ */
+/* ───────────── RESUMOS ───────────── */
 let _resInit = false;
 function iniciarResumos() { if (!_resInit) { _resInit = true; periodoRapido('mes'); } else renderResumos(); }
 function periodoRapido(p) {
@@ -3183,14 +3051,13 @@ function exportarMovimentosCSV() {
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
-/* ════════ UTILIZADORES ════════ */
+/* ───────────── UTILIZADORES ───────────── */
 let _usuarios = [];
 function rolesQueEuPossoCriar() { if (!SESSAO) return []; return SESSAO.role === 'master' ? ['master','admin','usuario','cotacionario'] : []; }
 function possoGerir(roleAlvo) { return rolesQueEuPossoCriar().includes(roleAlvo); }
 async function carregarUsuarios() {
   const wrap = document.getElementById('usr-list');
   if (!wrap) return;
-  if (SESSAO && SESSAO.legacy) { wrap.innerHTML = '<p style="font-size:12px;color:var(--muted)">Inicie sessão com o utilizador master.</p>'; return; }
   const r = await dbCall('listUsers', {});
   if (!r || !r.ok) { wrap.innerHTML = `<p style="font-size:12px;color:var(--red)">${esc((r && r.error) || 'Não foi possível carregar.')}</p>`; return; }
   _usuarios = r.users || [];
@@ -3259,18 +3126,11 @@ async function apagarUsuario(id) {
   showToast('Utilizador apagado.');
   carregarUsuarios();
 }
-function pedirTrocaSenha() {
-  if (!SESSAO || !SESSAO.token || document.getElementById('modal-conta').classList.contains('open')) return;
-  abrirMinhaConta();
-  const e = document.getElementById('conta-erro');
-  e.textContent = 'A sua palavra-passe foi redefinida. Defina uma nova para continuar.'; e.style.display = 'block';
-}
 function abrirMinhaConta() {
   if (!SESSAO) return;
   document.getElementById('conta-info').innerHTML = `<strong>${esc(SESSAO.nome || SESSAO.username)}</strong> (${esc(SESSAO.username)}) · Perfil: <strong>${esc((ROLES_INFO[SESSAO.role] || {}).nome || SESSAO.role)}</strong>`;
-  const comSenha = !!SESSAO.token;
-  document.getElementById('conta-senha-box').style.display = comSenha ? '' : 'none';
-  document.getElementById('conta-btn').style.display = comSenha ? '' : 'none';
+  document.getElementById('conta-senha-box').style.display = '';
+  document.getElementById('conta-btn').style.display = '';
   ['conta-atual','conta-nova','conta-nova2'].forEach(i => { document.getElementById(i).value = ''; document.getElementById(i).type = 'password'; });
   document.getElementById('conta-erro').style.display = 'none';
   document.getElementById('modal-conta').classList.add('open');
@@ -3288,14 +3148,11 @@ async function alterarMinhaSenha() {
   if (n1 !== n2) return falha('Não coincidem.');
   const r = await dbCall('changePassword', { atual, nova: n1 });
   if (!r || !r.ok) return falha((r && r.error) || 'Erro.');
-  if (r.token) SESSAO.token = r.token;   /* o servidor emite novo token ao mudar a palavra-passe */
-  guardarVerificadorOffline(SESSAO.username, n1, SESSAO);
   fecharModal();
   showToast('Alterada.');
-  sincronizarTudo(true);
 }
 
-/* ════════ LOG ════════ */
+/* ───────────── LOG ───────────── */
 const LOG_ACOES = {
   LOGIN_OK:['AUTH','Início de sessão'], LOGIN_FALHA:['AUTH','Login falhado'], LOGIN_BLOQUEADO:['AUTH','Login bloqueado'],
   AUTH_LOGIN_OFFLINE:['AUTH','Login offline'], AUTH_LOGOUT:['AUTH','Fim de sessão'], AUTH_EXPIRADA:['AUTH','Sessão expirada'], ACESSO_NEGADO:['AUTH','Acesso negado'],
@@ -3386,7 +3243,8 @@ let _logMostrar = 300;
 function renderLogs(mais) {
   const wrap = document.getElementById('log-list');
   if (!wrap) return;
-  if (mais) _logMostrar += 300; else if (mais === undefined) _logMostrar = 300;
+  if (mais === true) _logMostrar += 300;
+  else if (mais === undefined || mais === null) _logMostrar = 300;
   _logsVista = filtrarLogs();
   const pend = getLogs().filter(e => !e.env).length;
   document.getElementById('log-info').textContent = `${_logsVista.length} registo(s) · origem: ${_logsOrigem === 'servidor' ? 'BD (todos os dispositivos)' : 'local'}` + (pend ? ` · ${pend} por enviar` : '') + (_nArquivos ? ` · ${_nArquivos} arquivo(s)` : '');
@@ -3402,7 +3260,6 @@ function renderLogs(mais) {
   wrap.innerHTML = `<table class="res-table"><thead><tr><th>Data/hora</th><th>Utilizador</th><th>Perfil</th><th>Operação</th><th>Entidade</th><th>Ref.</th><th>Detalhe</th><th></th></tr></thead><tbody>${linhas}</tbody></table>` +
     (_logsVista.length > _logMostrar ? `<div style="margin-top:8px"><button class="btn btn-secondary btn-sm" onclick="renderLogs(true)">Mostrar mais (${_logsVista.length - _logMostrar})</button></div>` : '');
 }
-let _nArquivos = 0;
 function arqDataPadrao() { const d = new Date(); d.setDate(d.getDate() - 365); return dataLocalISO(d); }
 function arqErro(r) { return (r && r.error) ? r.error : 'Sem ligação.'; }
 async function simularArquivo() {
@@ -3439,7 +3296,7 @@ async function carregarArquivos() {
     r.arquivos.map(a => `<tr><td>${esc(a.nome)}</td><td>${esc(fmtDate(a.de))}</td><td>${esc(fmtDate(a.ate))}</td><td class="r">${+a.linhas || 0}</td>
       <td>${/^https:\/\/docs\.google\.com\//.test(a.url || '') ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">Abrir</a>` : ''}</td></tr>`).join('') + '</tbody></table>'
     : '<p style="font-size:12px;color:var(--muted)">Sem arquivos.</p>';
-  renderLogs(null);
+  renderLogs();
 }
 function analisarIntegridade(lista) {
   const porDev = {};
