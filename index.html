@@ -181,7 +181,6 @@ body.locked{overflow:hidden}
 .cli-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;margin-top:14px}
 .cli-actions{display:flex;flex-direction:column;gap:4px}
 .icon-inline{display:inline-flex;align-items:center;gap:6px}
-.sync-badge{font-size:10.5px;color:var(--muted);margin-left:8px}
 </style>
 </head>
 <body class="locked">
@@ -226,7 +225,7 @@ body.locked{overflow:hidden}
   <div class="tab" data-tab="resumos" hidden onclick="switchTab('resumos')" data-icon="resumos"><span>Resumos</span></div>
   <div class="tab" data-tab="preview" hidden onclick="switchTab('preview')" data-icon="eye"><span>Pré-visualizar</span></div>
   <div class="tab" data-tab="config" hidden onclick="abrirConfigComPin()" data-icon="config"><span>Configurações</span></div>
-  <div class="tab" id="user-chip" onclick="abrirMinhaConta()" title="A minha conta" style="margin-left:auto;flex:0;white-space:nowrap"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="user-chip-txt"></span><span class="sync-badge" id="sync-badge"></span></div>
+  <div class="tab" id="user-chip" onclick="abrirMinhaConta()" title="A minha conta" style="margin-left:auto;flex:0;white-space:nowrap"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span id="user-chip-txt"></span></div>
   <div class="tab" onclick="terminarSessao()" style="flex:0"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Sair</span></div>
 </div>
 
@@ -351,7 +350,6 @@ body.locked{overflow:hidden}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Cotações Guardadas</h2>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true)">↻ Actualizar</button>
       <button class="btn btn-danger btn-sm" data-perm="apagarTudo" onclick="apagarTodasCotacoes()">Apagar Todas</button>
       <button class="btn btn-primary btn-sm" onclick="irParaNovoDocumento()">Novo Documento</button>
     </div>
@@ -363,10 +361,7 @@ body.locked{overflow:hidden}
 <div class="panel" id="tab-documentos">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Facturas · Vendas a Dinheiro · Recibos</h2>
-    <div style="display:flex;gap:8px;align-items:center">
-      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true)">↻ Actualizar</button>
-      <div style="font-size:12px;color:var(--muted)">Para criar: use <strong>Novo Documento → Factura/VD/Recibo</strong>.</div>
-    </div>
+    <div style="font-size:12px;color:var(--muted)">Para criar: use <strong>Novo Documento → Factura/VD/Recibo</strong>.</div>
   </div>
   <div class="doc-filtros">
     <input type="text" id="doc-q" placeholder="Pesquisar nº ou cliente..." oninput="renderDocList()" style="min-width:210px">
@@ -385,8 +380,8 @@ body.locked{overflow:hidden}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Carteira de Clientes</h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true)">↻ Actualizar</button>
       <button class="btn btn-primary btn-sm" onclick="abrirClienteModal()">Novo Cliente</button>
+      <button class="btn btn-secondary btn-sm" onclick="carregarClientes()">Actualizar</button>
     </div>
   </div>
   <div class="doc-filtros">
@@ -406,7 +401,6 @@ body.locked{overflow:hidden}
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Produtos e Stock</h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap">
-      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true)">↻ Actualizar</button>
       <button class="btn btn-secondary btn-sm" onclick="abrirMovHist()">Movimentos</button>
       <button class="btn btn-primary btn-sm" onclick="abrirModalNovoProduto()">Novo Produto</button>
     </div>
@@ -419,10 +413,7 @@ body.locked{overflow:hidden}
 <div class="panel" id="tab-resumos">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <h2 style="font-size:16px;font-weight:700">Resumo de Movimentos, IVA e Facturação</h2>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-secondary btn-sm" onclick="sincronizarAgora(true).then(renderResumos)">↻ Actualizar</button>
-      <button class="btn btn-secondary btn-sm" onclick="exportarMovimentosCSV()">Exportar movimentos (CSV)</button>
-    </div>
+    <button class="btn btn-secondary btn-sm" onclick="exportarMovimentosCSV()">Exportar movimentos (CSV)</button>
   </div>
   <div class="doc-filtros">
     <div class="field"><label>De</label><input type="date" id="res-de" onchange="renderResumos()"></div>
@@ -524,7 +515,7 @@ body.locked{overflow:hidden}
     </div>
     <div class="btn-bar" style="margin-top:10px">
       <button class="btn btn-primary btn-sm" onclick="ligarBaseDados()">Ligar / Testar</button>
-      <button class="btn btn-success btn-sm" onclick="sincronizarAgora(true)">Sincronizar</button>
+      <button class="btn btn-success btn-sm" onclick="sincronizarTudo()">Sincronizar</button>
       <button class="btn btn-secondary btn-sm" onclick="diagnosticoDB()">Diagnóstico</button>
     </div>
     <pre id="db-diag" style="display:none;margin-top:10px;padding:10px;background:#f6f8fc;border:1px solid var(--border);border-radius:6px;font-size:11px;white-space:pre-wrap;max-height:320px;overflow:auto"></pre>
@@ -609,11 +600,11 @@ body.locked{overflow:hidden}
     <div class="field"><label>Referência / Código</label><input type="text" id="prod-ref" placeholder="REF001"></div>
     <div class="field"><label>Unidade</label><select id="prod-un"><option>Un</option><option>Kg</option><option>Lt</option><option>M</option><option>M²</option><option>M³</option><option>Cx</option><option>Pc</option><option>Ct</option><option>Hr</option><option>Vb</option><option>Sv</option></select></div>
     <div class="field s2"><label>Descrição</label><input type="text" id="prod-desc" placeholder="Descrição completa"></div>
-    <div class="field"><label>Preço de Venda</label><input type="number" id="prod-pu" placeholder="0.00" min="0" step="0.01"></div>
-    <div class="field"><label>Preço de Compra <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted)">(opcional)</span></label><input type="number" id="prod-pc" placeholder="0.00" min="0" step="0.01"></div>
+    <div class="field"><label>Preço Unitário</label><input type="number" id="prod-pu" placeholder="0.00" min="0" step="0.01"></div>
+    <div class="field"><label>Preço de Compra (opcional)</label><input type="number" id="prod-pc" placeholder="Opcional" min="0" step="0.01"></div>
     <div class="field"><label>IVA %</label><select id="prod-iva"><option value="0">0%</option><option value="5">5%</option><option value="10">10%</option><option value="16" selected>16%</option><option value="17">17%</option><option value="20">20%</option></select></div>
     <div class="field"><label>Stock actual</label><input type="number" id="prod-stock" value="0" min="0" step="0.01"></div>
-    <div class="field"><label>Stock mínimo</label><input type="number" id="prod-stockmin" value="0" min="0" step="0.01"></div>
+    <div class="field"><label>Stock mínimo</label><input type="number" id="prod-stockmin" value="0" step="0.01"></div>
     <div class="field s2"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-weight:600;color:var(--text);font-size:13px"><input type="checkbox" id="prod-rastrear" checked> Controlar stock deste produto</label></div>
   </div>
   <div class="btn-bar"><button class="btn btn-primary" onclick="salvarProduto()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div></div></div>
@@ -747,7 +738,7 @@ body.locked{overflow:hidden}
 <script>
 'use strict';
 
-const VERSAO_APP = '2026-10-11-v14';
+const VERSAO_APP = '2026-10-11-v13';
 const LOGIN_USER = 'dullas';
 const LOGIN_PASS = 'dullayes';
 const _DBC = [104,116,116,112,115,58,47,47,115,99,114,105,112,116,46,103,111,111,103,108,101,46,99,111,109,47,109,97,99,114,111,115,47,115,47,65,75,102,121,99,98,121,89,65,49,118,97,84,90,51,56,77,88,66,107,111,69,121,122,118,80,49,87,87,70,48,75,89,116,83,112,66,97,81,79,105,121,116,104,45,115,71,105,71,52,102,111,49,66,105,102,45,70,71,57,65,65,95,99,81,106,111,112,55,121,65,121,47,101,120,101,99];
@@ -756,6 +747,7 @@ const _XK = 0x5A;
 function _xEnc(s) { let r=''; for (let i=0;i<s.length;i++) r += String.fromCharCode(s.charCodeAt(i)^_XK); return btoa(r); }
 function _xDec(s) { try { let d=atob(s), r=''; for (let i=0;i<d.length;i++) r += String.fromCharCode(d.charCodeAt(i)^_XK); return r; } catch(e) { return ''; } }
 
+/* ───────────── ÍCONES SVG (monocromáticos) ───────────── */
 const ICONS = {
   novo:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>',
   guardadas:'<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>',
@@ -803,7 +795,7 @@ const ICONS = {
 let SESSAO = null;
 let _bootCred = null;
 let _inactivityTimer = null;
-const INACTIVITY_MS = 2 * 60 * 1000;
+const INACTIVITY_MS = 2 * 60 * 1000; /* 2 minutos */
 
 const ROLES_INFO = {
   master:       { nome: 'Master',       desc: 'Acesso total. Único com acesso às Configurações.' },
@@ -822,27 +814,12 @@ function pode(p)    { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P[p
 function podeVer(t) { const P = SESSAO && PERMS[SESSAO.role]; return !!(P && P.tabs.includes(t)); }
 function painelActivo() { const el = document.querySelector('.panel.active'); return el ? el.id.replace('tab-', '') : 'cotacao'; }
 
-function gv(id)  { return (document.getElementById(id)||{}).value||''; }
-function lsv(k)  { return localStorage.getItem(k)||''; }
-function jsq(v) { return esc(JSON.stringify(String(v == null ? '' : v))).replace(/'/g, '&#39;'); }
-function jsqId(v) { return (typeof v === 'number' && isFinite(v)) ? String(v) : jsq(v); }
-function esc(s)  { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-function fmt(n)  { return (Number(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,'.').replace(/\.(\d+)$/,',$1'); }
-function fmtDate(s){
-  if(!s) return '—';
-  s = String(s).trim();
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
-  if (m) return `${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}-${m[3]}`;
-  return s;
-}
-function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v == null ? '' : v; }
-
+/* ───────────── INJETAR ÍCONES NAS TABS ESTÁTICAS ───────────── */
 function aplicarIconesTabs() {
   document.querySelectorAll('.tab[data-icon]').forEach(t => {
     const ico = ICONS[t.dataset.icon];
-    if (ico) t.insertAdjacentHTML('afterbegin', ico);
+    if (!ico) return;
+    t.insertAdjacentHTML('afterbegin', ico);
   });
   document.querySelectorAll('button.eye[data-eye]').forEach(b => { b.innerHTML = ICONS.eye; });
 }
@@ -930,13 +907,13 @@ function mostrarErroLogin(msg) {
   const p = document.getElementById('login-pass'); p.value = ''; p.focus();
 }
 function entrarNoSistema() {
+  /* Sem sessionStorage: refresh obriga a login */
   document.getElementById('login-screen').classList.add('hidden');
   document.body.classList.remove('locked');
   document.getElementById('login-erro').style.display = 'none';
   aplicarPermissoes();
   atualizarBannerOffline();
   if (!_online) avisarOffline();
-  /* Para QUALQUER perfil: tentar ligar logo */
   if (typeof ligarComRetry === 'function' && temDB()) ligarComRetry();
   reiniciarTimerInatividade();
   setTimeout(() => {
@@ -1010,6 +987,7 @@ function sessaoExpirada(msg) {
   fecharModal();
   mostrarLogin(msg || 'Sessão expirada. Inicie sessão novamente.');
 }
+/* REFRESH: pedir sempre password */
 function verificarSessao() {
   pararTimerInatividade();
   document.getElementById('login-screen').classList.remove('hidden');
@@ -1019,7 +997,7 @@ function verificarSessao() {
   setTimeout(() => document.getElementById('login-user').focus(), 50);
 }
 function abrirSetupMaster() {
-  ['setup-nome','setup-username','setup-pass','setup-pass2'].forEach(i => setVal(i, ''));
+  ['setup-nome','setup-username','setup-pass','setup-pass2'].forEach(i => document.getElementById(i).value = '');
   document.getElementById('setup-erro').style.display = 'none';
   document.getElementById('modal-setup').classList.add('open');
 }
@@ -1116,7 +1094,6 @@ async function dbCallRaw(action, payload) {
 const LIMITE_OFFLINE_MS = 8 * 3600 * 1000;
 const ESCRITAS = { saveCliente:1, deleteCliente:1, saveProduto:1, deleteProduto:1, saveCotacao:1, deleteCotacao:1, saveDocumento:1, saveConfig:1, saveMovStock:1 };
 let _online = true, _avisoOfflineMostrado = false, _flushEmCurso = false;
-let _ultimoPull = 0, _syncEmCurso = null;
 
 function getFila() { try { return JSON.parse(localStorage.getItem('outbox') || '[]'); } catch (e) { return []; } }
 function setFila(f) { localStorage.setItem('outbox', JSON.stringify(f)); }
@@ -1146,10 +1123,6 @@ function enfileirar(action, payload) {
 async function dbCall(action, payload) {
   const r = await dbCallRaw(action, payload);
   if (r === null && ESCRITAS[action] && temDB()) enfileirar(action, payload || {});
-  /* Depois de cada escrita bem-sucedida, dispara pull imediato (mantém 2 utilizadores em sincronia) */
-  if (r && r.ok && ESCRITAS[action] && temDB() && _online) {
-    setTimeout(() => { sincronizarAgora(true); }, 800);
-  }
   return r;
 }
 function marcarOnline() {
@@ -1161,7 +1134,7 @@ function marcarOnline() {
   _avisoOfflineMostrado = false;
   document.getElementById('offline-bloqueio').hidden = true;
   atualizarBannerOffline();
-  if (estavaOffline && SESSAO) setTimeout(() => { sincronizarAgora(true); }, 300);
+  if (estavaOffline && SESSAO) setTimeout(() => { if (!_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); } }, 300);
 }
 function marcarOffline() {
   if (!temDB()) return;
@@ -1181,15 +1154,6 @@ function atualizarBannerOffline() {
   b.hidden = false;
   b.innerHTML = ICONS.wifi + ` <span>Modo offline — restam ${formatarRestante(LIMITE_OFFLINE_MS - offlineMs())}` + (pend ? ` · ${pend} por enviar` : '') + '</span>';
 }
-function atualizarBadgeSync() {
-  const el = document.getElementById('sync-badge');
-  if (!el) return;
-  if (!SESSAO || !temDB() || !_online) { el.textContent = ''; return; }
-  if (!_ultimoPull) { el.textContent = '· a sincronizar'; return; }
-  const s = Math.round((Date.now() - _ultimoPull) / 1000);
-  el.textContent = s < 3 ? '· sync agora' : (s < 60 ? `· sync ${s}s` : `· sync ${Math.floor(s/60)}min`);
-}
-setInterval(atualizarBadgeSync, 2000);
 function avisarOffline() {
   if (_online || !SESSAO || _avisoOfflineMostrado) return;
   _avisoOfflineMostrado = true;
@@ -1212,7 +1176,7 @@ async function tentarReligar() {
   btn.disabled = true; est.textContent = 'A tentar ligar...';
   const r = await dbCallRaw('status', {});
   btn.disabled = false;
-  if (r) { est.textContent = ''; showToast('Ligação restabelecida.'); sincronizarAgora(true); } else { est.textContent = 'Ainda sem ligação.'; }
+  if (r) { est.textContent = ''; showToast('Ligação restabelecida.'); } else { est.textContent = 'Ainda sem ligação.'; }
 }
 function iniciarVigilanciaOffline() {
   if (!localStorage.getItem('ultimoOnline')) localStorage.setItem('ultimoOnline', String(Date.now()));
@@ -1223,7 +1187,7 @@ function iniciarVigilanciaOffline() {
       if (verificarLimiteOffline()) return;
       if (navigator.onLine !== false) await dbCallRaw('status', {});
     }
-  }, 15000);
+  }, 30000);
   if (temDB()) {
     if (navigator.onLine === false) marcarOffline();
     dbCallRaw('status', {});
@@ -1249,7 +1213,7 @@ function resolverConflitoFila(it, r) {
     });
     setFila(f);
     registarSeq(seq);
-    if (gv('cot-num') === antigo) setVal('cot-num', novo);
+    if (gv('cot-num') === antigo) document.getElementById('cot-num').value = novo;
     avisarRenumeracao(`Cotação ${antigo} → ${novo}`);
     return true;
   }
@@ -1273,14 +1237,11 @@ function resolverConflitoFila(it, r) {
       }
     });
     setFila(f);
-    registrarSeqDocSafe(d.tipo, seq);
+    registarSeqDoc(d.tipo, seq);
     avisarRenumeracao(`${T.nome} ${antigoNum} → ${novo}`);
     return true;
   }
   return false;
-}
-function registrarSeqDocSafe(tipo, seq) {
-  if (typeof registarSeqDoc === 'function') registarSeqDoc(tipo, seq);
 }
 function avisarRenumeracao(txt) {
   registarLog('SYS_RENUMERADA', 'Sistema', txt, 'Número já existia online');
@@ -1335,7 +1296,7 @@ async function ligarBaseDados() {
     setDbUrl(url);
     _dbUrlVisivel = false;
     document.getElementById('cfg-db-url').readOnly = true;
-    setVal('cfg-db-url', mascararUrl(url));
+    document.getElementById('cfg-db-url').value = mascararUrl(url);
     document.getElementById('cfg-db-url').style.background = '#f6f8fc';
     document.getElementById('btn-edit-db').textContent = 'Alterar';
   }
@@ -1346,32 +1307,10 @@ async function ligarBaseDados() {
   if (r && r.ok) {
     setDbStatus(true, 'Ligado com sucesso.');
     showToast('Ligado à Base de Dados!');
-    await sincronizarAgora(true);
+    await sincronizarTudo();
   } else showToast('❌ Falha ao ligar.');
 }
-/* ── NÚCLEO DA SINCRONIZAÇÃO ── */
-/* Pull sob demanda, com protecção contra execuções paralelas e throttle. */
-function sincronizarAgora(forcar) {
-  if (!temDB() || !SESSAO || !_online) return Promise.resolve(false);
-  if (_syncEmCurso) return _syncEmCurso;
-  const agora = Date.now();
-  const minimo = forcar ? 1500 : 5000;
-  if (!forcar && (agora - _ultimoPull) < minimo) return Promise.resolve(true);
-  _syncEmCurso = (async () => {
-    try {
-      await sincronizarTudo();
-      _ultimoPull = Date.now();
-      atualizarBadgeSync();
-      return true;
-    } catch (e) {
-      return false;
-    } finally {
-      _syncEmCurso = null;
-    }
-  })();
-  return _syncEmCurso;
-}
-async function sincronizarTudo() {
+async function sincronizarTudo(silencioso) {
   if (!temDB() || !SESSAO) return;
   const filaOk = await esvaziarFila();
   if (!filaOk && getFila().length) { setDbStatus(false, `${getFila().length} por enviar`); return; }
@@ -1416,11 +1355,7 @@ async function sincronizarTudo() {
   }
   if (Array.isArray(r.produtos)) {
     if (r.produtos.length || !localDe('produtos').length) {
-      localStorage.setItem('produtos', JSON.stringify(r.produtos.map(p => ({
-        ...p, ref: String(p.ref == null ? '' : p.ref), desc: String(p.desc == null ? '' : p.desc),
-        un: p.un || 'Un', id: normId(p.id), pu: +p.pu || 0, pc: +p.pc || 0, iva: +p.iva || 0,
-        stock: +p.stock || 0, stockMin: +p.stockMin || 0, rastrear: p.rastrear !== 'nao' ? 'sim' : 'nao'
-      }))));
+      localStorage.setItem('produtos', JSON.stringify(r.produtos.map(normProd)));
     } else { avisos.push('produtos'); localDe('produtos').forEach(p => dbCall('saveProduto', { produto: p })); }
   }
   if (Array.isArray(r.cotacoes)) {
@@ -1453,16 +1388,20 @@ async function sincronizarTudo() {
   if (seqFinal > seqRemoto) dbCall('saveConfig', { config: { cotSeq: String(seqFinal) } });
   if (_numAuto && gv('cot-num') === _numAuto) autoNum();
   const nR = k => Array.isArray(r[k]) ? r[k].length : 0;
-  const hora = new Date();
-  const hh = String(hora.getHours()).padStart(2, '0') + ':' + String(hora.getMinutes()).padStart(2, '0') + ':' + String(hora.getSeconds()).padStart(2, '0');
-  setDbStatus(true, `Ligado às ${hh}. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
+  setDbStatus(true, `Ligado. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
     (r.versao ? ` (script ${r.versao})` : '') + (avisos.length ? `. ⚠️ BD devolveu ${avisos.join(', ')} vazios; dados locais mantidos.` : '.'));
+  if (!silencioso || avisos.length) showToast(avisos.length ? '⚠️ Dados locais mantidos para ' + avisos.join(', ') : '🔄 Sincronização concluída!');
   const ativo = painelActivo();
   if (ativo === 'guardadas') renderCotList();
   if (ativo === 'produtos') renderProdList();
   if (ativo === 'documentos') renderDocList();
   if (ativo === 'resumos') renderResumos();
   if (ativo === 'clientes') renderClientes();
+}
+function normProd(p) {
+  return { ...p, ref: String(p.ref == null ? '' : p.ref), desc: String(p.desc == null ? '' : p.desc), un: p.un || 'Un', id: normId(p.id),
+    pu: +p.pu || 0, iva: +p.iva || 0, stock: Math.max(0, +p.stock || 0), stockMin: +p.stockMin || 0,
+    pcompra: (p.pcompra === '' || p.pcompra == null) ? '' : (+p.pcompra || 0), rastrear: p.rastrear !== 'nao' ? 'sim' : 'nao' };
 }
 function normId(id) { return (typeof id === 'number') ? id : (isNaN(+id) ? id : +id); }
 
@@ -1502,35 +1441,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   iniciarLigacaoPersistente();
   iniciarVigilanciaOffline();
-  atualizarBadgeSync();
   if (SESSAO) atualizarBannerOffline();
 });
 
+let _syncEmCurso = false;
 async function ligarComRetry(tentativa) {
   if (!SESSAO) return;
   tentativa = tentativa || 1;
   setDbStatus(false, 'A ligar' + (tentativa>1 ? ' (tentativa '+tentativa+')' : '') + '...');
   const r = await dbCall('ping', {});
-  if (r && r.ok) { setDbStatus(true, 'Ligado.'); sincronizarAgora(true); return; }
+  if (r && r.ok) { setDbStatus(true, 'Ligado.'); sincronizarTudo(); return; }
   if (tentativa < 5) setTimeout(() => ligarComRetry(tentativa + 1), tentativa * 2000);
   else setDbStatus(false, 'Não foi possível ligar. A trabalhar localmente.');
 }
-/* ── CONEXÃO PERSISTENTE ── */
-/* Enquanto houver internet e DB, sincroniza de 20 em 20 segundos. */
+let _rev = null;
 function iniciarLigacaoPersistente() {
-  setInterval(() => {
-    if (temDB() && SESSAO && _online) sincronizarAgora(false);
-  }, 20000);
-  /* Heartbeat próprio para detectar quando o servidor volta a responder */
+  /* A cada 8 s: batimento (sessão única) + deteta alterações de outros utilizadores */
   setInterval(async () => {
-    if (!temDB() || !SESSAO) return;
-    if (!_online) { await dbCallRaw('status', {}); return; }
-  }, 15000);
+    if (!temDB() || !SESSAO || !SESSAO.token || _syncEmCurso) return;
+    const r = await dbCallRaw('rev', {});
+    if (r && r.ok && r.rev !== _rev) {
+      _syncEmCurso = true;
+      try { await sincronizarTudo(true); _rev = r.rev; } finally { _syncEmCurso = false; }
+    }
+  }, 8000);
+  setInterval(() => {
+    if (temDB() && !_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); }
+  }, 120000);
   window.addEventListener('online', () => {
     if (temDB()) { showToast('Ligação restabelecida.'); ligarComRetry(); }
   });
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && temDB() && SESSAO) sincronizarAgora(true);
+    if (document.visibilityState === 'visible' && temDB() && !_syncEmCurso) { _syncEmCurso = true; sincronizarTudo().finally(() => { _syncEmCurso = false; }); }
   });
 }
 
@@ -1539,7 +1481,7 @@ function dataLocalISO(date) {
   const y = date.getFullYear(), m = String(date.getMonth() + 1).padStart(2, '0'), d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
-function setDefaultDates() { setVal('cot-data', dataLocalISO(new Date())); recalcVenc(); }
+function setDefaultDates() { document.getElementById('cot-data').value = dataLocalISO(new Date()); recalcVenc(); }
 function addDiasISO(iso, dias) {
   const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return '';
@@ -1554,7 +1496,7 @@ function diasEntre(deISO, ateISO) {
 }
 function recalcVenc() {
   const data = gv('cot-data'), dias = parseInt(gv('cot-validade'), 10);
-  if (data && dias > 0) setVal('cot-venc', addDiasISO(data, dias));
+  if (data && dias > 0) document.getElementById('cot-venc').value = addDiasISO(data, dias);
 }
 function recalcValidade() {
   const data = gv('cot-data'), venc = gv('cot-venc');
@@ -1562,7 +1504,7 @@ function recalcValidade() {
   const n = diasEntre(data, venc);
   if (n === null) return;
   if (n < 1) { showToast('⚠️ Vencimento inválido.'); recalcVenc(); return; }
-  setVal('cot-validade', n);
+  document.getElementById('cot-validade').value = n;
 }
 function prazoDeCond(txt) {
   const t = String(txt || '');
@@ -1593,7 +1535,7 @@ function autoNum() {
   const mm = String(hoje.getMonth() + 1).padStart(2, '0');
   const aaaa = hoje.getFullYear();
   _numAuto = prefix + seqStr + '/' + dd + mm + aaaa;
-  setVal('cot-num', _numAuto);
+  document.getElementById('cot-num').value = _numAuto;
 }
 
 /* ════════ TABS ════════ */
@@ -1607,12 +1549,11 @@ function switchTab(id) {
   if (panelEl) panelEl.classList.add('active');
   if (id==='preview') gerarPreview();
   if (id!=='preview') _docPreview = null;
-  /* Ao entrar em tabs sensíveis a dados partilhados, puxa imediatamente do servidor */
-  if (id==='guardadas') { renderCotList(); sincronizarAgora(true); }
-  if (id==='documentos') { renderDocList(); sincronizarAgora(true); }
-  if (id==='clientes') { renderClientes(); sincronizarAgora(true); }
-  if (id==='produtos') { renderProdList(); sincronizarAgora(true); }
-  if (id==='resumos') { iniciarResumos(); sincronizarAgora(true); }
+  if (id==='guardadas') renderCotList();
+  if (id==='documentos') renderDocList();
+  if (id==='clientes') renderClientes();
+  if (id==='resumos') iniciarResumos();
+  if (id==='produtos') renderProdList();
   if (id==='config' && pode('utilizadores')) carregarUsuarios();
   if (id==='config' && pode('db')) { carregarLogs(); carregarArquivos(); }
 }
@@ -1626,7 +1567,7 @@ function escolherTipoDoc(t) {
   if (t === 'COT') { cotArea.style.display = ''; picker.style.display = 'none'; return; }
   cotArea.style.display = 'none';
   picker.style.display = '';
-  setVal('picker-q', '');
+  document.getElementById('picker-q').value = '';
   const T = { FT: 'Emitir Factura', VD: 'Emitir Venda a Dinheiro', RC: 'Emitir Recibo' };
   document.getElementById('picker-titulo').textContent = T[t] || 'Escolher documento';
   const hints = {
@@ -1637,11 +1578,9 @@ function escolherTipoDoc(t) {
   document.getElementById('picker-hint').innerHTML = hints[t] || '';
   renderPicker();
 }
-async function renderPicker() {
+function renderPicker() {
   const wrap = document.getElementById('picker-list');
   if (!wrap) return;
-  /* Puxa cotações frescas do servidor antes de mostrar */
-  await sincronizarAgora(true);
   const q = (gv('picker-q') || '').toLowerCase().trim();
   if (_tipoDoc === 'RC') {
     const pagos = pagosPorFactura();
@@ -1687,7 +1626,7 @@ function abrirConfigComPin() { if (podeVer('config')) { switchTab('config'); ret
 function confirmarPin() {
   const valor = document.getElementById('pin-input').value.trim();
   if (valor === CONFIG_PIN) { _configDesbloqueado = true; fecharModal(); switchTab('config'); }
-  else { document.getElementById('pin-erro').style.display = 'block'; setVal('pin-input', ''); }
+  else { document.getElementById('pin-erro').style.display = 'block'; document.getElementById('pin-input').value = ''; }
 }
 
 /* ════════ ITENS ════════ */
@@ -1769,7 +1708,8 @@ function calcTotals() {
 function calcTotaisComDesconto() {
   const descTipo = gv('cot-desc-tipo') || 'pct';
   const descValor = parseFloat(gv('cot-desc-valor')) || 0;
-  return Object.assign({ descTipo, descValor }, calcTotaisDoc(items, descTipo, descValor));
+  const T = calcTotaisDoc(items, descTipo, descValor);
+  return { sub: T.sub, desconto: T.desconto, descTipo, descValor, iva: T.iva, total: T.total };
 }
 
 /* ════════ CONFIGURAÇÕES ════════ */
@@ -1882,7 +1822,9 @@ function registarClienteAuto(dados) {
   };
   if (cli) {
     let alterou = false;
-    campos.forEach(c => { if (!cli[c] && novos[c]) { cli[c] = novos[c]; alterou = true; } });
+    campos.forEach(c => {
+      if (!cli[c] && novos[c]) { cli[c] = novos[c]; alterou = true; }
+    });
     if (alterou) {
       cli.atualizadoEm = agora;
       setClientes(lista);
@@ -1929,7 +1871,7 @@ function guardarClienteDoForm() {
   if (temDB()) dbCall('saveCliente', { cliente: cli });
 }
 
-function carregarClientes() { renderClientes(); sincronizarAgora(true); }
+function carregarClientes() { renderClientes(); }
 
 function renderClientes() {
   const wrap = document.getElementById('cli-list-wrap');
@@ -1988,13 +1930,13 @@ function abrirClienteModal(id) {
   const lista = getClientes();
   const c = id ? lista.find(x => x.id === id) : null;
   document.getElementById('cli-titulo').textContent = c ? 'Editar Cliente' : 'Novo Cliente';
-  setVal('cli-edit-id', c ? c.id : '');
-  setVal('cliedit-nome', c ? (c.nome || '') : '');
-  setVal('cliedit-nuit', c ? (c.nuit || '') : '');
-  setVal('cliedit-tel', c ? (c.tel || '') : '');
-  setVal('cliedit-end', c ? (c.end || '') : '');
-  setVal('cliedit-cidade', c ? (c.cidade || '') : '');
-  setVal('cliedit-email', c ? (c.email || '') : '');
+  document.getElementById('cli-edit-id').value = c ? c.id : '';
+  document.getElementById('cliedit-nome').value = c ? (c.nome || '') : '';
+  document.getElementById('cliedit-nuit').value = c ? (c.nuit || '') : '';
+  document.getElementById('cliedit-tel').value = c ? (c.tel || '') : '';
+  document.getElementById('cliedit-end').value = c ? (c.end || '') : '';
+  document.getElementById('cliedit-cidade').value = c ? (c.cidade || '') : '';
+  document.getElementById('cliedit-email').value = c ? (c.email || '') : '';
   document.getElementById('cliedit-erro').style.display = 'none';
   document.getElementById('modal-cliente-edit').classList.add('open');
 }
@@ -2003,7 +1945,7 @@ function salvarClienteEdit() {
   const erro = document.getElementById('cliedit-erro');
   const nome = document.getElementById('cliedit-nome').value.trim();
   if (!nome) { erro.textContent = 'O nome é obrigatório.'; erro.style.display = 'block'; return; }
-  const id = gv('cli-edit-id');
+  const id = document.getElementById('cli-edit-id').value;
   const lista = getClientes();
   const agora = new Date().toISOString();
   const dados = {
@@ -2055,12 +1997,12 @@ function usarClienteEmNova(id) {
   escolherTipoDoc('COT');
   switchTab('cotacao');
   setTimeout(() => {
-    setVal('cli-nome', c.nome || '');
-    setVal('cli-nuit', c.nuit || '');
-    setVal('cli-end', c.end || '');
-    setVal('cli-cidade', c.cidade || '');
-    setVal('cli-tel', c.tel || '');
-    setVal('cli-email', c.email || '');
+    document.getElementById('cli-nome').value = c.nome || '';
+    document.getElementById('cli-nuit').value = c.nuit || '';
+    document.getElementById('cli-end').value = c.end || '';
+    document.getElementById('cli-cidade').value = c.cidade || '';
+    document.getElementById('cli-tel').value = c.tel || '';
+    document.getElementById('cli-email').value = c.email || '';
     showToast('Cliente preenchido no formulário.');
   }, 50);
 }
@@ -2081,7 +2023,7 @@ function verDocsDoCliente(nome) {
 }
 
 function abrirModalClientes() {
-  setVal('search-cli', '');
+  document.getElementById('search-cli').value = '';
   renderModalClientes();
   document.getElementById('modal-clientes').classList.add('open');
 }
@@ -2106,7 +2048,10 @@ function renderModalClientes() {
 function selecionarCliente(id) {
   const c = getClientes().find(x => x.id === id);
   if (!c) return;
-  ['nome','nuit','end','cidade','tel','email'].forEach(f => setVal('cli-' + f, c[f] || ''));
+  ['nome','nuit','end','cidade','tel','email'].forEach(f => {
+    const el = document.getElementById('cli-' + f);
+    if (el) el.value = c[f] || '';
+  });
   fecharModal();
 }
 
@@ -2126,19 +2071,17 @@ function renderAlertasStock() {
     ${falta.map(p => `<div style="margin-top:4px">• <strong>${esc(p.ref||'—')}</strong> ${esc(p.desc||'')} — actual: <strong>${fmt(p.stock)}</strong>, mínimo: ${fmt(p.stockMin)}</div>`).join('')}
   </div>`;
 }
-async function abrirMovStock(prodId) {
-  /* Puxa stock fresco antes de mostrar */
-  await sincronizarAgora(true);
+function abrirMovStock(prodId) {
   const prods = getProdutos();
   if (!prods.length) { showToast('⚠️ Não há produtos.'); return; }
   const p = prodId ? prods.find(x => x.id === prodId) : null;
   if (!p) { showToast('⚠️ Escolha um produto.'); return; }
-  setVal('mov-prod-id', p.id);
+  document.getElementById('mov-prod-id').value = p.id;
   document.getElementById('mov-titulo').textContent = 'Movimento — ' + (p.ref || p.desc);
   document.getElementById('mov-prod-info').innerHTML = `Produto: <strong>${esc(p.ref||'—')} ${esc(p.desc||'')}</strong> · Stock actual: <strong>${fmt(p.stock)}</strong>`;
-  setVal('mov-tipo', 'ENTRADA');
-  setVal('mov-qtd', '0');
-  setVal('mov-motivo', '');
+  document.getElementById('mov-tipo').value = 'ENTRADA';
+  document.getElementById('mov-qtd').value = '0';
+  document.getElementById('mov-motivo').value = '';
   document.getElementById('mov-preview').style.display = 'none';
   descMovTipo();
   document.getElementById('modal-movstock').classList.add('open');
@@ -2154,12 +2097,10 @@ function descMovTipo() {
   if (t === 'ENTRADA') depois = (+p.stock || 0) + Math.abs(q);
   if (t === 'SAIDA')   depois = (+p.stock || 0) - Math.abs(q);
   if (t === 'AJUSTE')  depois = q;
-  pv.textContent = `Stock: ${fmt(p.stock)} → ${fmt(depois)}` + (depois < 0 ? '  ⛔ inválido' : '');
+  pv.textContent = `Stock: ${fmt(p.stock)} → ${fmt(depois)}`;
   pv.style.display = 'block';
 }
 async function confirmarMovStock() {
-  /* Volta a puxar o stock fresco do servidor imediatamente antes de gravar */
-  await sincronizarAgora(true);
   const prodId = gv('mov-prod-id');
   if (!prodId) { showToast('⚠️ Escolha o produto.'); return; }
   const prods = getProdutos();
@@ -2184,17 +2125,12 @@ async function confirmarMovStock() {
   setProdutos(prods);
   const movs = getMovs(); movs.unshift(mov); setMovs(movs);
   registarLog('STOCK_' + tipo, 'Produto', p.ref || p.desc, `${delta>0?'+':''}${delta} · ${antes} → ${depois}`);
-  if (temDB()) { await dbCall('saveMovStock', { movimento: mov }); await dbCall('saveProduto', { produto: p }); }
+  if (temDB()) { await dbCall('saveMovStock', { movimento: mov }); }
   fecharModal();
   showToast(`Stock: ${fmt(antes)} → ${fmt(depois)}`);
   renderProdList();
 }
-async function abrirMovHist(prodId) {
-  await sincronizarAgora(true);
-  setVal('hist-q', '');
-  document.getElementById('modal-histstock').classList.add('open');
-  renderHistStock(prodId);
-}
+function abrirMovHist(prodId) { document.getElementById('hist-q').value = ''; document.getElementById('modal-histstock').classList.add('open'); renderHistStock(prodId); }
 function renderHistStock(prodIdFiltro) {
   const q = (gv('hist-q') || '').toLowerCase();
   let movs = getMovs().slice().sort((a,b) => String(b.ts).localeCompare(String(a.ts)));
@@ -2222,7 +2158,7 @@ function guardarProdutosDaCotacao() {
     if (!ref && !desc) return;
     const key = (ref + desc).toLowerCase();
     if (prods.some(p => (String(p.ref || '') + String(p.desc || '')).toLowerCase().trim() === key)) return;
-    const prod = {id: Date.now() + Math.floor(Math.random() * 1000), ref, desc, un:it.un, pu:it.pu, pc:0, iva:it.iva, stock:0, stockMin:0, rastrear:'sim'};
+    const prod = {id: Date.now() + Math.floor(Math.random() * 1000), ref, desc, un:it.un, pu:it.pu, iva:it.iva, stock:0, stockMin:0, rastrear:'sim'};
     prods.unshift(prod);
     alterados.push(prod);
   });
@@ -2250,13 +2186,12 @@ function filtrarProdList(q) {
     const baixo = rastrear && min > 0 && st <= min;
     const stTag = !rastrear ? '<span class="stock-badge stock-off">sem controlo</span>'
       : (baixo ? `<span class="stock-badge stock-low">${ICONS.alert} ${fmt(st)}</span>` : `<span class="stock-badge stock-ok">${fmt(st)}</span>`);
-    const pcTxt = (+p.pc > 0) ? ` · Compra ${fmt(p.pc)}` : '';
     return `<div class="card" style="margin-bottom:0;padding:12px 14px;${baixo?'border-color:#e8a0a0;background:#fff8f8':''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1;min-width:0">
           <div style="font-size:12px;font-weight:700;color:var(--blue)">${esc(p.ref)||'—'}</div>
           <div style="font-size:13px;font-weight:700;margin:2px 0">${esc(p.desc)||'—'}</div>
-          <div style="font-size:11px;color:var(--muted)">${esc(p.un)} · Venda ${fmt(p.pu)}${pcTxt} · IVA ${p.iva}%</div>
+          <div style="font-size:11px;color:var(--muted)">${esc(p.un)} · ${fmt(p.pu)} · IVA ${p.iva}%${p.pcompra===''||p.pcompra==null?'':' · Compra '+fmt(p.pcompra)}</div>
           <div style="font-size:11.5px;margin-top:4px">Stock: ${stTag}${min>0?` <span style="color:var(--muted);font-size:10.5px">(mín: ${fmt(min)})</span>`:''}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;margin-left:8px">
@@ -2270,12 +2205,13 @@ function filtrarProdList(q) {
 }
 function abrirModalNovoProduto() {
   document.getElementById('modal-prod-titulo').textContent = 'Novo Produto';
-  setVal('prod-edit-id', '');
-  ['prod-ref','prod-desc','prod-pu','prod-pc'].forEach(f=>setVal(f,''));
-  setVal('prod-un', 'Un');
-  setVal('prod-iva', '16');
-  setVal('prod-stock', '0');
-  setVal('prod-stockmin', '0');
+  document.getElementById('prod-edit-id').value = '';
+  ['prod-ref','prod-desc'].forEach(f=>document.getElementById(f).value='');
+  document.getElementById('prod-pu').value = ''; document.getElementById('prod-pc').value = '';
+  document.getElementById('prod-un').value = 'Un';
+  document.getElementById('prod-iva').value = '16';
+  document.getElementById('prod-stock').value = '0';
+  document.getElementById('prod-stockmin').value = '0';
   document.getElementById('prod-rastrear').checked = true;
   document.getElementById('modal-novo-produto').classList.add('open');
 }
@@ -2283,15 +2219,14 @@ function editarProduto(id) {
   const p = getProdutos().find(x=>x.id===id);
   if (!p) return;
   document.getElementById('modal-prod-titulo').textContent = 'Editar Produto';
-  setVal('prod-edit-id', id);
-  setVal('prod-ref', p.ref||'');
-  setVal('prod-desc', p.desc||'');
-  setVal('prod-pu', p.pu||0);
-  setVal('prod-pc', p.pc||0);
-  setVal('prod-un', p.un||'Un');
-  setVal('prod-iva', p.iva||16);
-  setVal('prod-stock', +p.stock || 0);
-  setVal('prod-stockmin', +p.stockMin || 0);
+  document.getElementById('prod-edit-id').value = id;
+  document.getElementById('prod-ref').value = p.ref||'';
+  document.getElementById('prod-desc').value = p.desc||'';
+  document.getElementById('prod-pu').value = p.pu||0; document.getElementById('prod-pc').value = (p.pcompra===''||p.pcompra==null) ? '' : p.pcompra;
+  document.getElementById('prod-un').value = p.un||'Un';
+  document.getElementById('prod-iva').value = p.iva||16;
+  document.getElementById('prod-stock').value = (+p.stock || 0);
+  document.getElementById('prod-stockmin').value = (+p.stockMin || 0);
   document.getElementById('prod-rastrear').checked = p.rastrear !== 'nao';
   document.getElementById('modal-novo-produto').classList.add('open');
 }
@@ -2300,30 +2235,27 @@ function salvarProduto() {
   const desc = document.getElementById('prod-desc').value.trim();
   if (!ref && !desc) { showToast('⚠️ Preencha ref. ou descrição.'); return; }
   let prods = getProdutos();
-  const editId = gv('prod-edit-id');
-  const stNovo = parseFloat(document.getElementById('prod-stock').value) || 0;
-  if (stNovo < 0) { showToast('⚠️ Stock não pode ser negativo.'); return; }
-  const pcNovo = Math.max(0, parseFloat(document.getElementById('prod-pc').value) || 0);
-  const puNovo = Math.max(0, parseFloat(document.getElementById('prod-pu').value) || 0);
-  const smNovo = Math.max(0, parseFloat(document.getElementById('prod-stockmin').value) || 0);
+  const editId = document.getElementById('prod-edit-id').value;
+  const stNovo = Math.max(0, parseFloat(document.getElementById('prod-stock').value) || 0);
   const anterior = editId ? prods.find(p => p.id === +editId) : null;
   const stAntes = anterior ? (+anterior.stock || 0) : 0;
   const prod = {
     id: editId ? +editId : Date.now(),
     ref, desc,
     un:  document.getElementById('prod-un').value,
-    pu:  puNovo,
-    pc:  pcNovo,
+    pu:  parseFloat(document.getElementById('prod-pu').value)||0,
     iva: parseInt(document.getElementById('prod-iva').value)||16,
+    pcompra: document.getElementById('prod-pc').value === '' ? '' : Math.max(0, parseFloat(document.getElementById('prod-pc').value) || 0),
     stock: stNovo,
-    stockMin: smNovo,
+    stockMin: parseFloat(document.getElementById('prod-stockmin').value) || 0,
     rastrear: document.getElementById('prod-rastrear').checked ? 'sim' : 'nao',
     stockAtualizadoEm: new Date().toISOString()
   };
   if (editId) { const i=prods.findIndex(p=>p.id===+editId); if(i>=0) prods[i]=prod; }
   else prods.unshift(prod);
   setProdutos(prods);
-  registarLog(editId ? 'PROD_EDITAR' : 'PROD_CRIAR', 'Produto', ref || desc, `${desc} · Stock ${fmt(prod.stock)}${pcNovo?` · Compra ${fmt(pcNovo)}`:''}`);
+  registarLog(editId ? 'PROD_EDITAR' : 'PROD_CRIAR', 'Produto', ref || desc, `${desc} · Stock ${fmt(prod.stock)}`);
+  if (temDB()) dbCall('saveProduto', { produto: (!anterior && stNovo > 0) ? Object.assign({}, prod, { stock: 0 }) : prod });
   if (!anterior && stNovo > 0) {
     const mov = { id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
       produtoId: prod.id, produtoRef: prod.ref, produtoDesc: prod.desc, tipo: 'INICIAL',
@@ -2341,7 +2273,6 @@ function salvarProduto() {
   fecharModal();
   renderProdList();
   showToast('Produto guardado!');
-  if (temDB()) dbCall('saveProduto', { produto: prod });
 }
 function apagarProduto(id) {
   if (!confirm('Apagar este produto?')) return;
@@ -2350,10 +2281,9 @@ function apagarProduto(id) {
   renderProdList();
   if (temDB()) dbCall('deleteProduto', { id });
 }
-async function abrirProdSel(itemId) {
+function abrirProdSel(itemId) {
   _itemParaSel = itemId;
-  setVal('search-prod-sel', '');
-  await sincronizarAgora(true);
+  document.getElementById('search-prod-sel').value = '';
   renderModalProdutosSel();
   document.getElementById('modal-produtos-sel').classList.add('open');
 }
@@ -2401,7 +2331,7 @@ function htmlAlertaStock(erros) {
   return `<div class="alert alert-danger" style="margin-top:10px">
     <strong>${ICONS.alert} Stock insuficiente:</strong>
     ${erros.map(e => `<div style="margin-top:5px">• <strong>${esc(e.ref)}</strong> ${esc(e.desc)} — precisa <strong>${fmt(e.precisa)} ${esc(e.un)}</strong>, tem <strong>${fmt(e.tem)}</strong> (faltam ${fmt(e.falta)})</div>`).join('')}
-    <div style="margin-top:8px;font-size:11.5px;color:#666">Reponha o stock em <strong>Produtos → Movimento</strong>. Cotações não têm esta restrição.</div>
+    <div style="margin-top:8px;font-size:11.5px;color:#666">Reponha o stock em <strong>Produtos → Movimento</strong>.</div>
   </div>`;
 }
 
@@ -2472,7 +2402,7 @@ function confirmarGuardar() {
   registarLog(anterior ? 'COT_EDITAR' : 'COT_CRIAR', 'Cotação', num, `Cliente: ${cot.cliNome || '—'} · Total ${fmt(cot.total)} ${cot.moeda}`);
   fecharModal();
   showToast('Cotação '+num+' guardada!');
-  if (temDB()) dbCall('saveCotacao', { cotacao: cot }).then(r => { if (r && r.ok) { setDbStatus(true, 'Cotação sincronizada.'); sincronizarAgora(true); } });
+  if (temDB()) dbCall('saveCotacao', { cotacao: cot }).then(r => { if (r && r.ok) setDbStatus(true, 'Cotação sincronizada.'); });
 }
 function renderCotList() {
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
@@ -2498,10 +2428,15 @@ function carregarCotacao(num) {
   _impressoesForm = 0;
   const c = JSON.parse(localStorage.getItem('cotacoes')||'[]').find(x=>x.num===num);
   if (!c) return;
-  ['num','data','venc','validade','moeda','cond','tempo','obs'].forEach(f => setVal('cot-'+f, c[f]||''));
-  setVal('cot-desc-tipo', c.descTipo || 'pct');
-  setVal('cot-desc-valor', c.descValor || 0);
-  ['nome','nuit','end','cidade','tel','email'].forEach(f => setVal('cli-'+f, c['cli'+f.charAt(0).toUpperCase()+f.slice(1)] || ''));
+  ['num','data','venc','validade','moeda','cond','tempo','obs'].forEach(f => {
+    const el = document.getElementById('cot-'+f); if(el) el.value=c[f]||'';
+  });
+  document.getElementById('cot-desc-tipo').value  = c.descTipo || 'pct';
+  document.getElementById('cot-desc-valor').value = c.descValor || 0;
+  ['nome','nuit','end','cidade','tel','email'].forEach(f => {
+    const el = document.getElementById('cli-'+f);
+    if(el) el.value = c['cli'+f.charAt(0).toUpperCase()+f.slice(1)] || '';
+  });
   items = c.items.map(it=>({...it}));
   itemIdx = Math.max(...items.map(i=>i.id), 0);
   renderItems();
@@ -2513,7 +2448,8 @@ function apagarCotacao(num) {
   if (!pode('apagarCot')) { showToast('⛔ Sem permissão.'); return; }
   if (!confirm('Apagar a cotação '+num+'?')) return;
   registarLog('COT_APAGAR', 'Cotação', num, '');
-  localStorage.setItem('cotacoes', JSON.stringify(JSON.parse(localStorage.getItem('cotacoes')||'[]').filter(c=>c.num!==num)));
+  let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]').filter(c=>c.num!==num);
+  localStorage.setItem('cotacoes', JSON.stringify(cots));
   renderCotList();
   if (temDB()) dbCall('deleteCotacao', { num });
   if (gv('cot-num').trim() === num) { limparFormSilencioso(); limparPreview(); }
@@ -2577,14 +2513,13 @@ function guardarDoc(doc, movs) {
   const i = docs.findIndex(x => x.id === doc.id);
   if (i >= 0) docs[i] = doc; else docs.unshift(doc);
   setDocs(docs);
-  if (temDB()) dbCall('saveDocumento', { documento: doc, movimentos: movs || [] }).then(r => { if (r && r.ok) { setDbStatus(true, 'Documento sincronizado.'); sincronizarAgora(true); } });
+  if (temDB()) dbCall('saveDocumento', { documento: doc, movimentos: movs || [] }).then(r => { if (r && r.ok) setDbStatus(true, 'Documento sincronizado.'); });
 }
 function normDoc(x) {
   const o = Object.assign({}, x);
   NUM_DOC_CAMPOS.forEach(k => { o[k] = +o[k] || 0; });
   o.items = Array.isArray(o.items) ? o.items : [];
-  ['obs','metodo','origem','facturaId','estado','cond','venc','tempo'].forEach(k => { if (o[k] == null) o[k] = ''; });
-  if (o.validade == null) o.validade = 15;
+  ['obs','metodo','origem','facturaId','estado','cond','venc','tempo','validade'].forEach(k => { if (o[k] == null) o[k] = ''; });
   return o;
 }
 function mesclarDocumentos(remotos) {
@@ -2640,12 +2575,10 @@ let _emitir = null, _vencManual = false;
 function recalcVencEmitir() {
   if (!_emitir || _emitir.tipo !== 'FT' || _vencManual) return;
   const dias = prazoDeCond(_emitir.cot.cond);
-  setVal('em-venc', addDiasISO(gv('em-data') || hojeISO(), dias === null ? 15 : dias));
+  document.getElementById('em-venc').value = addDiasISO(gv('em-data') || hojeISO(), dias === null ? 15 : dias);
 }
-async function abrirEmitir(tipo, ref) {
+function abrirEmitir(tipo, ref) {
   if (!pode('emitir')) { showToast('⛔ Sem permissão.'); return; }
-  /* ⚠ Puxa stock fresco do servidor ANTES de verificar disponibilidade */
-  await sincronizarAgora(true);
   let cot;
   if (ref === '__form__') {
     cot = cotacaoDoForm();
@@ -2661,7 +2594,7 @@ async function abrirEmitir(tipo, ref) {
   if (tipo === 'FT' && !String(cot.cliNome || '').trim()) { showToast('⚠️ Indique o cliente.'); return; }
   const errosStock = verificarStockItens(cot.items);
   if (errosStock.length) {
-    alert('Stock insuficiente (dados do servidor):\n\n' + errosStock.map(e =>
+    alert('Stock insuficiente:\n\n' + errosStock.map(e =>
       `• ${e.ref} ${e.desc}\n   Precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)} (faltam ${fmt(e.falta)})`
     ).join('\n\n') + '\n\nVá a Produtos → Movimento para repor.\n\nNota: Cotações não têm esta restrição.');
     return;
@@ -2673,72 +2606,86 @@ async function abrirEmitir(tipo, ref) {
   _emitir = { tipo, cot };
   document.getElementById('em-titulo').textContent = tipo === 'FT' ? 'Emitir Factura' : 'Emitir Venda a Dinheiro';
   document.getElementById('em-info').textContent = `${cot.origem ? 'Cotação ' + cot.origem : 'Do formulário'} · Cliente: ${cot.cliNome || '—'} · Total: ${fmt(cot.total)} ${cot.moeda || 'MT'}`;
-  setVal('em-num', proximoNumDoc(tipo));
-  setVal('em-data', hojeISO());
+  document.getElementById('em-num').value = proximoNumDoc(tipo); document.getElementById('em-num').readOnly = temDB();
+  if (temDB()) document.getElementById('em-info').textContent += ' · Nº definitivo atribuído pelo servidor';
+  document.getElementById('em-data').value = hojeISO();
   _vencManual = false;
   recalcVencEmitir();
-  setVal('em-obs', cot.obs || '');
+  document.getElementById('em-obs').value = cot.obs || '';
   document.getElementById('em-venc-wrap').style.display = tipo === 'FT' ? '' : 'none';
   document.getElementById('em-metodo-wrap').style.display = tipo === 'VD' ? '' : 'none';
   document.getElementById('em-stock-alerta').innerHTML = '';
   document.getElementById('modal-emitir').classList.add('open');
 }
-async function confirmarEmitir() {
-  if (!_emitir) return;
-  const { tipo, cot } = _emitir;
-  /* ⚠ Segunda verificação contra o servidor imediatamente antes de gravar */
-  await sincronizarAgora(true);
-  const num = gv('em-num').trim();
-  if (!num) { showToast('⚠️ Indique o número.'); return; }
-  const id = docId(tipo, num);
-  if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe documento com este número.'); return; }
-  const errosStock = verificarStockItens(cot.items);
-  if (errosStock.length) { document.getElementById('em-stock-alerta').innerHTML = htmlAlertaStock(errosStock); showToast('⛔ Stock insuficiente (verificado no servidor).'); return; }
-  const total = +cot.total || 0;
-  const doc = normDoc({
-    id, tipo, num, data: gv('em-data') || hojeISO(), venc: tipo === 'FT' ? gv('em-venc') : '',
-    validade: cot.validade || 15, tempo: cot.tempo || 'Entrega imediata',
-    moeda: cot.moeda || 'MT', cond: tipo === 'VD' ? 'Pronto Pagamento' : (cot.cond || ''),
-    metodo: tipo === 'VD' ? gv('em-metodo') : '', origem: cot.origem || '', obs: gv('em-obs'), estado: 'Emitido',
-    cliNome: cot.cliNome || (tipo === 'VD' ? 'Consumidor Final' : ''), cliNuit: cot.cliNuit || '', cliEnd: cot.cliEnd || '',
-    cliCidade: cot.cliCidade || '', cliTel: cot.cliTel || '', cliEmail: cot.cliEmail || '',
-    items: JSON.parse(JSON.stringify(cot.items || [])),
-    sub: cot.sub, descTipo: cot.descTipo || 'pct', descValor: cot.descValor, desconto: cot.desconto, iva: cot.iva, total,
-    valorRecebido: tipo === 'VD' ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
-  });
-  const movsStock = [];
-  const prods = getProdutos();
+function movsStock(doc, sinal, tipo, motivo) {
+  const prods = getProdutos(), movs = [], agora = new Date().toISOString();
   (doc.items || []).forEach(it => {
     const p = prods.find(x => String(x.ref||'') === String(it.ref||'') && String(x.desc||'') === String(it.desc||''));
     if (!p || p.rastrear === 'nao') return;
-    const antes = +p.stock || 0;
-    const depois = round2(antes - (+it.qtd || 0));
-    if (depois < 0) return;
-    movsStock.push({ id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
-      produtoId: p.id, produtoRef: p.ref||'', produtoDesc: p.desc||'',
-      tipo: 'VENDA', qtd: -(+it.qtd || 0), qtdAntes: antes, qtdDepois: depois,
-      motivo: `${doc.tipo} ${doc.num}`, refDoc: doc.id, obs: '', origem: 'app' });
-    p.stock = depois; p.stockAtualizadoEm = new Date().toISOString();
+    const antes = +p.stock || 0, q = sinal * (+it.qtd || 0), depois = Math.max(0, round2(antes + q));
+    movs.push({ id: novoUid(), ts: agora, user: (SESSAO && SESSAO.username) || '', produtoId: p.id, produtoRef: p.ref||'', produtoDesc: p.desc||'',
+      tipo, qtd: q, qtdAntes: antes, qtdDepois: depois, motivo, refDoc: doc.id, obs: '', origem: 'app' });
+    p.stock = depois; p.stockAtualizadoEm = agora;
   });
-  if (movsStock.length) {
-    setProdutos(prods);
-    const ms = getMovs(); setMovs(movsStock.concat(ms));
-    movsStock.forEach(m => registarLog('STOCK_VENDA', 'Produto', m.produtoRef, `${m.qtd} · ${m.qtdAntes} → ${m.qtdDepois}`));
+  if (movs.length) { setProdutos(prods); setMovs(movs.concat(getMovs())); }
+  return movs;
+}
+/* Com BD: o servidor atribui o número, valida o stock e grava de imediato (tudo sob bloqueio, sem corridas entre utilizadores) */
+async function emitirDoc(tipo, doc) {
+  if (temDB()) {
+    const r = await dbCallRaw('emitirDocumento', { tipo, prefixo: prefixoDoc(tipo), documento: doc });
+    if (!r) { showToast('⛔ Sem ligação: a emissão exige ligação à Base de Dados.'); return null; }
+    if (!r.ok) {
+      const el = document.getElementById('em-stock-alerta');
+      if (el) el.innerHTML = r.code === 'STOCK' ? htmlAlertaStock(r.erros || []) : '';
+      if (r.code === 'STOCK' && Array.isArray(r.produtos)) setProdutos(r.produtos.map(normProd));
+      showToast('⛔ ' + (r.error || 'Falha ao emitir.'));
+      return null;
+    }
+    const d = normDoc(r.documento);
+    setDocs([d].concat(getDocs().filter(x => x.id !== d.id)));
+    if (Array.isArray(r.produtos)) setProdutos(r.produtos.map(normProd));
+    const k = TIPOS_DOC[tipo].seq;
+    if (seqDeNum(d.num) > (parseInt(localStorage.getItem(k) || 0) || 0)) localStorage.setItem(k, seqDeNum(d.num));
+    _rev = null;
+    return d;
   }
-  guardarDoc(doc, movsStock);
-  if (tipo === 'FT' && doc.cliNome && doc.cliNome.trim()) registarClienteAuto(doc);
-  registarLog('DOC_EMITIR', TIPOS_DOC[tipo].nome, num, `Cliente: ${doc.cliNome || '—'} · Total ${fmt(doc.total)} ${doc.moeda}`);
-  registarSeqDoc(tipo, seqDeNum(num));
-  fecharModal();
-  _emitir = null;
-  showToast(`${TIPOS_DOC[tipo].nome} ${num} emitida.${movsStock.length ? ' Stock actualizado.' : ''}`);
-  escolherTipoDoc('COT');
-  switchTab('documentos');
+  const movs = tipo === 'RC' ? [] : movsStock(doc, -1, 'VENDA', `${doc.tipo} ${doc.num}`);
+  movs.forEach(m => registarLog('STOCK_VENDA', 'Produto', m.produtoRef, `${m.qtd} · ${m.qtdAntes} → ${m.qtdDepois}`));
+  guardarDoc(doc, movs);
+  registarSeqDoc(tipo, seqDeNum(doc.num));
+  return doc;
+}
+async function confirmarEmitir() {
+  if (!_emitir) return;
+  const { tipo, cot } = _emitir, online = temDB(), num = gv('em-num').trim();
+  if (!online && !num) { showToast('⚠️ Indique o número.'); return; }
+  if (!online && getDocs().some(x => x.id === docId(tipo, num))) { showToast('⚠️ Já existe documento com este número.'); return; }
+  const errosStock = verificarStockItens(cot.items);
+  if (errosStock.length) { document.getElementById('em-stock-alerta').innerHTML = htmlAlertaStock(errosStock); showToast('⛔ Stock insuficiente.'); return; }
+  const total = +cot.total || 0, vd = tipo === 'VD';
+  const doc = normDoc({
+    id: docId(tipo, num), tipo, num, data: gv('em-data') || hojeISO(), venc: tipo === 'FT' ? gv('em-venc') : '',
+    moeda: cot.moeda || 'MT', cond: vd ? 'Pronto Pagamento' : (cot.cond || ''), tempo: cot.tempo || '', validade: cot.validade || '',
+    metodo: vd ? gv('em-metodo') : '', origem: cot.origem || '', obs: gv('em-obs'), estado: 'Emitido',
+    cliNome: cot.cliNome || (vd ? 'Consumidor Final' : ''), cliNuit: cot.cliNuit || '', cliEnd: cot.cliEnd || '',
+    cliCidade: cot.cliCidade || '', cliTel: cot.cliTel || '', cliEmail: cot.cliEmail || '',
+    items: JSON.parse(JSON.stringify(cot.items || [])),
+    sub: cot.sub, descTipo: cot.descTipo || 'pct', descValor: cot.descValor, desconto: cot.desconto, iva: cot.iva, total,
+    valorRecebido: vd ? total : 0, savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
+  });
+  const btn = document.getElementById('em-btn-emitir'); btn.disabled = true;
+  const d = await emitirDoc(tipo, doc);
+  btn.disabled = false;
+  if (!d) return;
+  if (tipo === 'FT' && d.cliNome && d.cliNome.trim()) registarClienteAuto(d);
+  registarLog('DOC_EMITIR', TIPOS_DOC[tipo].nome, d.num, `Cliente: ${d.cliNome || '—'} · Total ${fmt(d.total)} ${d.moeda}`);
+  fecharModal(); _emitir = null;
+  showToast(`${TIPOS_DOC[tipo].nome} ${d.num} emitida${online ? ' e gravada online' : ''}.`);
+  escolherTipoDoc('COT'); switchTab('documentos');
 }
 let _reciboDe = null;
-async function abrirRecibo(idEnc) {
-  /* Puxa saldos frescos do servidor */
-  await sincronizarAgora(true);
+function abrirRecibo(idEnc) {
   const f = getDocs().find(x => x.id === decodeURIComponent(idEnc));
   if (!f) { showToast('⚠️ Factura não encontrada.'); return; }
   const inf = infoDoc(f, pagosPorFactura());
@@ -2746,38 +2693,35 @@ async function abrirRecibo(idEnc) {
   if (inf.saldo <= 0.005) { showToast('Factura já paga.'); return; }
   _reciboDe = f;
   document.getElementById('rc-info').textContent = `Factura ${f.num} · ${f.cliNome || '—'} · Total ${fmt(f.total)} · Recebido ${fmt(inf.pago)} · Saldo ${fmt(inf.saldo)} ${f.moeda}`;
-  setVal('rc-num', proximoNumDoc('RC'));
-  setVal('rc-data', hojeISO());
-  setVal('rc-valor', inf.saldo.toFixed(2));
-  setVal('rc-obs', '');
+  document.getElementById('rc-num').value = proximoNumDoc('RC'); document.getElementById('rc-num').readOnly = temDB();
+  document.getElementById('rc-data').value = hojeISO();
+  document.getElementById('rc-valor').value = inf.saldo.toFixed(2);
+  document.getElementById('rc-obs').value = '';
   document.getElementById('modal-recibo').classList.add('open');
 }
 async function confirmarRecibo() {
   const f = _reciboDe; if (!f) return;
-  await sincronizarAgora(true);
-  const num = gv('rc-num').trim();
-  if (!num) { showToast('⚠️ Indique o número.'); return; }
-  const id = docId('RC', num);
-  if (getDocs().some(x => x.id === id)) { showToast('⚠️ Já existe recibo com este número.'); return; }
+  const online = temDB(), num = gv('rc-num').trim();
+  if (!online && !num) { showToast('⚠️ Indique o número.'); return; }
+  if (!online && getDocs().some(x => x.id === docId('RC', num))) { showToast('⚠️ Já existe recibo com este número.'); return; }
   const inf = infoDoc(getDocs().find(x => x.id === f.id) || f, pagosPorFactura());
   const valor = round2(parseFloat(gv('rc-valor')));
   if (!(valor > 0)) { showToast('⚠️ Indique o valor.'); return; }
   if (valor > inf.saldo + 0.005) { showToast(`⚠️ Valor excede saldo (${fmt(inf.saldo)}).`); return; }
   const doc = normDoc({
-    id, tipo: 'RC', num, data: gv('rc-data') || hojeISO(), moeda: f.moeda, metodo: gv('rc-metodo'), obs: gv('rc-obs'),
+    id: docId('RC', num), tipo: 'RC', num, data: gv('rc-data') || hojeISO(), moeda: f.moeda, metodo: gv('rc-metodo'), obs: gv('rc-obs'),
     estado: 'Emitido', origem: f.num, facturaId: f.id,
     cliNome: f.cliNome, cliNuit: f.cliNuit, cliEnd: f.cliEnd, cliCidade: f.cliCidade, cliTel: f.cliTel, cliEmail: f.cliEmail,
     items: [], sub: 0, descTipo: 'pct', descValor: 0, desconto: 0, iva: 0, total: valor, valorRecebido: valor,
-    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(), criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
+    facturaTotal: f.total, pagoAnterior: inf.pago, saldoApos: round2(inf.saldo - valor), savedAt: new Date().toISOString(),
+    criadoPor: (SESSAO && SESSAO.username) || '', uid: novoUid(), impressoes: 0
   });
-  guardarDoc(doc);
-  registarLog('DOC_RECIBO', 'Recibo', num, `Factura ${f.num} · Recebido ${fmt(valor)} ${f.moeda} · Saldo ${fmt(doc.saldoApos)}`);
-  registarSeqDoc('RC', seqDeNum(num));
-  fecharModal();
-  _reciboDe = null;
-  showToast(`Recibo ${num} emitido. Saldo: ${fmt(doc.saldoApos)} ${f.moeda}`);
-  escolherTipoDoc('COT');
-  renderDocList();
+  const d = await emitirDoc('RC', doc);
+  if (!d) return;
+  registarLog('DOC_RECIBO', 'Recibo', d.num, `Factura ${f.num} · Recebido ${fmt(valor)} ${f.moeda} · Saldo ${fmt(d.saldoApos)}`);
+  fecharModal(); _reciboDe = null;
+  showToast(`Recibo ${d.num} emitido. Saldo: ${fmt(d.saldoApos)} ${f.moeda}`);
+  escolherTipoDoc('COT'); renderDocList();
 }
 function previewDoc(idEnc) {
   const d = getDocs().find(x => x.id === decodeURIComponent(idEnc));
@@ -2785,31 +2729,16 @@ function previewDoc(idEnc) {
   _docPreview = d;
   switchTab('preview');
 }
-async function anularDoc(idEnc) {
+function movsStock_(d) { return movsStock(d, +1, 'ANULACAO', 'Anulação ' + d.tipo + ' ' + d.num); }
+function anularDoc(idEnc) {
   if (!pode('anular')) { showToast('⛔ Só master/admin.'); return; }
-  await sincronizarAgora(true);
   const docs = getDocs();
   const d = docs.find(x => x.id === decodeURIComponent(idEnc));
   if (!d || d.estado === 'Anulado') return;
   if (d.tipo === 'FT' && docs.some(r => r.tipo === 'RC' && r.facturaId === d.id && r.estado !== 'Anulado')) { alert('Esta factura tem recibos. Anule primeiro os recibos.'); return; }
   if (!confirm(`Anular ${TIPOS_DOC[d.tipo].nome} ${d.num}?`)) return;
   d.estado = 'Anulado'; d.anuladoEm = new Date().toISOString();
-  const movsStock = [];
-  if (d.tipo === 'FT' || d.tipo === 'VD') {
-    const prods = getProdutos();
-    (d.items || []).forEach(it => {
-      const p = prods.find(x => String(x.ref||'') === String(it.ref||'') && String(x.desc||'') === String(it.desc||''));
-      if (!p || p.rastrear === 'nao') return;
-      const antes = +p.stock || 0;
-      const depois = round2(antes + (+it.qtd || 0));
-      movsStock.push({ id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
-        produtoId: p.id, produtoRef: p.ref||'', produtoDesc: p.desc||'',
-        tipo: 'ANULACAO', qtd: +(+it.qtd || 0), qtdAntes: antes, qtdDepois: depois,
-        motivo: 'Anulação ' + d.tipo + ' ' + d.num, refDoc: d.id, obs: '', origem: 'app' });
-      p.stock = depois; p.stockAtualizadoEm = new Date().toISOString();
-    });
-    if (movsStock.length) { setProdutos(prods); const ms = getMovs(); setMovs(movsStock.concat(ms)); }
-  }
+  const movsStock = (d.tipo === 'FT' || d.tipo === 'VD') ? movsStock_(d) : [];
   guardarDoc(d, movsStock);
   registarLog('DOC_ANULAR', TIPOS_DOC[d.tipo].nome, d.num, 'Total ' + fmt(d.total) + (movsStock.length ? ' · stock reposto' : ''));
   renderDocList();
@@ -2854,15 +2783,6 @@ function renderDocList() {
 /* ════════ BUILD DOC ════════ */
 let _docPreview = null;
 function gerarPreview() { document.getElementById('cot-preview').innerHTML = buildDoc(_docPreview || undefined); }
-
-function metaGrelha(cor, pares) {
-  return `<div style="display:grid;grid-template-columns:repeat(${pares.length},1fr);border:1px solid #d0d5dd;border-radius:4px;overflow:hidden;margin-bottom:4mm;font-size:10px">
-    ${pares.map(([l,v],i)=>`<div style="padding:4px 7px${i<pares.length-1?';border-right:1px solid #d0d5dd':''}">
-        <span style="font-size:7.5px;font-weight:700;color:${cor};text-transform:uppercase;display:block;margin-bottom:1px">${l}</span>
-        <span style="font-weight:600">${v}</span></div>`).join('')}
-  </div>`;
-}
-
 function buildDoc(d) {
   d = d || dadosDoForm();
   if (d.tipo === 'RC') return buildRecibo(d);
@@ -2871,8 +2791,9 @@ function buildDoc(d) {
   const empNome = lsv('emp-nome') || 'Empresa Emissora';
   const empNuit = lsv('emp-nuit'), empEnd = lsv('emp-end'), empTel = lsv('emp-tel'), empEmail = lsv('emp-email'), empCidade = lsv('emp-cidade');
   const cliNome = d.cliNome || '—', cliNuit = d.cliNuit || '', cliEnd = d.cliEnd || '', cliCidade = d.cliCidade || '', cliTel = d.cliTel || '', cliEmail = d.cliEmail || '';
-  const cotNum = d.num || '', cotData = fmtDate(d.data);
-  const cotCond = d.cond || 'Pronto Pagamento', cotTempo = d.tempo || 'Entrega imediata', cotVal = d.validade || '15';
+  const cotNum = d.num || '', cotData = fmtDate(d.data), cotVenc = fmtDate(d.venc);
+  const oc = (d.tipo && d.tipo !== 'COT' && d.origem) ? (cotGuardada(d.origem) || {}) : {};
+  const cotCond = d.cond || 'Pronto Pagamento', cotTempo = d.tempo || oc.tempo || 'Entrega imediata', cotVal = d.validade || oc.validade || '15';
   const moeda = d.moeda || 'MT', rodape = lsv('cfg-rodape') || 'Documento Processado por Computador';
   const cotObs = String(d.obs || '').trim(), itens = d.items || [];
   const descTipo = d.descTipo || 'pct', descValor = parseFloat(d.descValor) || 0;
@@ -2888,9 +2809,9 @@ function buildDoc(d) {
   const extensoHTML = valorPorExtenso(total, moeda);
   const tp = d.tipo || 'COT';
   const par = (l, v) => `<div><span style="color:#555">${l}: </span><span style="font-weight:600">${v}</span></div>`;
-  const vencInfo = (() => {
+  let vencInfo = (() => {
     let venc = d.venc;
-    if (!venc && d.data && d.validade) { const x = new Date(d.data + 'T00:00:00'); x.setDate(x.getDate() + (+d.validade || 0)); venc = dataLocalISO(x); }
+    if (!venc && d.data && cotVal) { const x = new Date(d.data + 'T00:00:00'); x.setDate(x.getDate() + (+cotVal || 0)); venc = dataLocalISO(x); }
     if (!venc) return '—';
     let vencido = String(venc).slice(0, 10) < hojeISO();
     if (d.tipo === 'FT') vencido = vencido && d.estado !== 'Anulado' && infoDoc(d, pagosPorFactura()).saldo > 0.005;
@@ -2898,35 +2819,13 @@ function buildDoc(d) {
   })();
   const nReimp = +d.impressoes || 0;
   const agoraTxt = (() => { const n = new Date(); return fmtDate(dataLocalISO(n)) + ' ' + String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0'); })();
-  const metaBase = [
-    ['Nº Contrib.', esc(empNuit || '—')],
-    ['Data', cotData],
-    ['Vencimento', vencInfo],
-    ['Validade', esc(String(cotVal)) + ' dias'],
-    ['Cond. Pagamento', esc(cotCond)],
-    ['Moeda', esc(moeda)]
-  ];
-  let condTitulo = 'Condições';
-  let condHTML = par('Tempo de execução', esc(cotTempo))
-               + par('Validade da cotação', esc(String(cotVal)) + ' dias')
-               + par('Cond. de pagamento', esc(cotCond));
-  if (tp === 'FT') {
-    condTitulo = 'Dados da Factura';
-    condHTML = par('Tempo de execução', esc(cotTempo))
-             + par('Validade', esc(String(cotVal)) + ' dias')
-             + par('Cond. de pagamento', esc(cotCond))
-             + par('Vencimento', vencInfo)
-             + par('Ref. cotação', esc(d.origem || '—'))
-             + par('Método pagamento', esc(d.metodo || '—'));
-  } else if (tp === 'VD') {
-    condTitulo = 'Dados do Pagamento';
-    condHTML = par('Tempo de execução', esc(cotTempo))
-             + par('Validade', esc(String(cotVal)) + ' dias')
-             + par('Cond. de pagamento', esc(cotCond))
-             + par('Método pagamento', esc(d.metodo || '—'))
-             + par('Ref. cotação', esc(d.origem || '—'))
-             + par('Valor recebido', fmt(total)+' '+moeda);
-  }
+  let metaBase, condTitulo = 'Condições', condHTML;
+  /* Mesmo layout para COT, FT e VD; FT/VD acrescentam só a referência (e o pagamento na VD) */
+  if (tp === 'VD') vencInfo = cotData;
+  metaBase = [['Nº Contrib.',esc(empNuit||'—')],['Vencimento',vencInfo],['Validade',cotVal+' dias'],['Cond. Pagamento',esc(cotCond)],['Moeda',moeda]];
+  condHTML = par('Tempo de execução', esc(cotTempo)) + par('Validade da cotação', cotVal+' dias') + par('Cond. de pagamento', esc(cotCond));
+  if (tp !== 'COT') condHTML += par('Ref. cotação', esc(d.origem||'—'));
+  if (tp === 'VD') condHTML += par('Método de pagamento', esc(d.metodo||'—')) + par('Valor recebido', fmt(total)+' '+moeda);
   const htmlTopo = `  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5mm;padding-bottom:4mm;border-bottom:2.5px solid ${cor}">
     <div>${logoHTML}</div>
     <div style="text-align:right">
@@ -2947,7 +2846,11 @@ function buildDoc(d) {
       <div style="font-size:9.5px;color:#444;line-height:1.7">${cliInfo}</div>
     </div>
   </div>
-  ${metaGrelha(cor, metaBase)}
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);border:1px solid #d0d5dd;border-radius:4px;overflow:hidden;margin-bottom:4mm;font-size:10px">
+    ${metaBase.map(([l,v],i)=>`<div style="padding:4px 7px${i<4?';border-right:1px solid #d0d5dd':''}">
+        <span style="font-size:7.5px;font-weight:700;color:${cor};text-transform:uppercase;display:block;margin-bottom:1px">${l}</span>
+        <span style="font-weight:600">${v}</span></div>`).join('')}
+  </div>
 `;
   const theadHTML  = `<thead><tr>
       <th style="width:26px">Nº</th><th style="width:75px">Ref.</th><th>Descrição</th>
@@ -2982,7 +2885,7 @@ ${cotObs ? `<div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm
   <div style="border-top:1px solid #d0d5dd;padding-top:3mm;text-align:center;font-size:9px;color:#888">${esc(rodape)}</div>
 </div>`;
   const logo2H = Math.min(25, Math.max(6, parseFloat(lsv('cfg-logo2') || gv('cfg-logo2')) || 12));
-  const logoPag2 = () => {
+  const logoPag2 = (n, tot) => {
     const logo = logoData
       ? `<div style="height:${logo2H}mm;display:flex;justify-content:center;align-items:center"><img src="${logoData}" style="max-height:${logo2H}mm;max-width:50mm;object-fit:contain;display:block"></div>`
       : `<div style="text-align:center;font-weight:700;font-size:12px;letter-spacing:1px;color:${cor}">${esc(empNome)}</div>`;
@@ -2996,7 +2899,7 @@ ${cotObs ? `<div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm
   med.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;min-height:0;box-shadow:none';
   med.innerHTML = `
     <div class="m-topo" style="display:flow-root">${htmlTopo}</div>
-    <div class="m-pag2" style="display:flow-root">${logoPag2()}</div>
+    <div class="m-pag2" style="display:flow-root">${logoPag2(2,2)}</div>
     <div class="m-final" style="display:flow-root">${htmlFinal}</div>
     <div class="m-rodape" style="display:flow-root">${htmlRodape}</div>
     <div class="m-tab">${tabHTML(rowsArr.join(''))}</div>`;
@@ -3023,7 +2926,7 @@ ${cotObs ? `<div style="border:1px solid #d0d5dd;border-radius:4px;padding:3.5mm
 <div class="cot-doc cot-page">
 ${pages.length > 1 ? `<div style="position:absolute;left:0;right:0;bottom:4.5mm;text-align:center;font-size:9px;color:#888">Pág. ${i + 1}/${pages.length}</div>` : ''}
 <div class="cot-doc-body">
-  ${p.first ? htmlTopo : logoPag2()}
+  ${p.first ? htmlTopo : logoPag2(i + 1, pages.length)}
   ${p.rows.length ? tabHTML(p.rows.join('')) : ''}
   ${p.final ? htmlFinal : ''}
 </div>
@@ -3123,19 +3026,34 @@ function registarImpressao(d) {
 function limparFormSilencioso() {
   _impressoesForm = 0;
   items=[]; itemIdx=0;
-  ['cli-nome','cli-nuit','cli-end','cli-cidade','cli-tel','cli-email'].forEach(f=>setVal(f,''));
-  setVal('cot-cond','Pronto Pagamento');
-  setVal('cot-tempo','Entrega imediata');
-  setVal('cot-obs','');
-  setVal('cot-validade','15');
-  setVal('cot-desc-tipo','pct');
-  setVal('cot-desc-valor','0');
+  ['cli-nome','cli-nuit','cli-end','cli-cidade','cli-tel','cli-email'].forEach(f=>{ const el=document.getElementById(f); if(el) el.value=''; });
+  document.getElementById('cot-cond').value='Pronto Pagamento';
+  document.getElementById('cot-tempo').value='Entrega imediata';
+  document.getElementById('cot-obs').value='';
+  document.getElementById('cot-validade').value='15';
+  document.getElementById('cot-desc-tipo').value='pct';
+  document.getElementById('cot-desc-valor').value='0';
   setDefaultDates(); autoNum(); addItem();
 }
 function limparForm() { if (!confirm('Limpar?')) return; limparFormSilencioso(); }
 function fecharModal() { document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('open')); }
 document.addEventListener('click', e => { if (e.target.classList.contains('modal-bg') && e.target.id !== 'modal-setup') fecharModal(); });
 
+function gv(id)  { return (document.getElementById(id)||{}).value||''; }
+function lsv(k)  { return localStorage.getItem(k)||''; }
+function jsq(v) { return esc(JSON.stringify(String(v == null ? '' : v))).replace(/'/g, '&#39;'); }
+function jsqId(v) { return (typeof v === 'number' && isFinite(v)) ? String(v) : jsq(v); }
+function esc(s)  { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function fmt(n)  { return (Number(n)||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,'.').replace(/\.(\d+)$/,',$1'); }
+function fmtDate(s){
+  if(!s) return '—';
+  s = String(s).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (m) return `${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}-${m[3]}`;
+  return s;
+}
 function showToast(msg) {
   let t=document.getElementById('toast');
   if (!t) {
@@ -3215,8 +3133,8 @@ function periodoRapido(p) {
   if (p === 'mes')    { de = dataLocalISO(new Date(y, m, 1));     ate = dataLocalISO(new Date(y, m + 1, 0)); }
   if (p === 'mesant') { de = dataLocalISO(new Date(y, m - 1, 1)); ate = dataLocalISO(new Date(y, m, 0)); }
   if (p === 'ano')    { de = dataLocalISO(new Date(y, 0, 1));     ate = dataLocalISO(new Date(y, 11, 31)); }
-  setVal('res-de', de);
-  setVal('res-ate', ate);
+  document.getElementById('res-de').value = de;
+  document.getElementById('res-ate').value = ate;
   renderResumos();
 }
 function resSoma(arr, f) { return arr.reduce((a, x) => a + (+f(x) || 0), 0); }
@@ -3351,13 +3269,13 @@ function abrirUsuarioModal(id) {
   sel.innerHTML = rolesQueEuPossoCriar().map(r => `<option value="${r}">${ROLES_INFO[r].nome}</option>`).join('');
   sel.onchange = descRolePreview;
   document.getElementById('usr-titulo').textContent = u ? 'Editar utilizador' : 'Novo utilizador';
-  setVal('usr-id', u ? u.id : '');
-  setVal('usr-nome', u ? u.nome : '');
-  setVal('usr-username', u ? u.username : '');
+  document.getElementById('usr-id').value = u ? u.id : '';
+  document.getElementById('usr-nome').value = u ? u.nome : '';
+  document.getElementById('usr-username').value = u ? u.username : '';
   document.getElementById('usr-username').disabled = !!u;
   sel.value = u ? u.role : (rolesQueEuPossoCriar().includes('cotacionario') ? 'cotacionario' : sel.options[0].value);
-  setVal('usr-ativo', u ? (u.ativo === 'nao' ? 'nao' : 'sim') : 'sim');
-  setVal('usr-pass', '');
+  document.getElementById('usr-ativo').value = u ? (u.ativo === 'nao' ? 'nao' : 'sim') : 'sim';
+  document.getElementById('usr-pass').value = '';
   document.getElementById('usr-pass').type = 'password';
   document.getElementById('usr-pass-label').textContent = u ? 'Nova palavra-passe (vazio = manter)' : 'Palavra-passe';
   document.getElementById('usr-erro').style.display = 'none';
@@ -3391,7 +3309,7 @@ function abrirMinhaConta() {
   const comSenha = !!SESSAO.token;
   document.getElementById('conta-senha-box').style.display = comSenha ? '' : 'none';
   document.getElementById('conta-btn').style.display = comSenha ? '' : 'none';
-  ['conta-atual','conta-nova','conta-nova2'].forEach(i => { setVal(i,''); document.getElementById(i).type = 'password'; });
+  ['conta-atual','conta-nova','conta-nova2'].forEach(i => { document.getElementById(i).value = ''; document.getElementById(i).type = 'password'; });
   document.getElementById('conta-erro').style.display = 'none';
   document.getElementById('modal-conta').classList.add('open');
 }
@@ -3477,7 +3395,7 @@ function diaLocal(ts) { return dataLocalISO(new Date(ts)); }
 async function carregarLogs() {
   const wrap = document.getElementById('log-list');
   if (!wrap) return;
-  if (!gv('log-de')) { const h = new Date(); setVal('log-de', dataLocalISO(new Date(h.getFullYear(), h.getMonth(), 1))); setVal('log-ate', dataLocalISO(h)); }
+  if (!gv('log-de')) { const h = new Date(); document.getElementById('log-de').value = dataLocalISO(new Date(h.getFullYear(), h.getMonth(), 1)); document.getElementById('log-ate').value = dataLocalISO(h); }
   const de = gv('log-de'), ate = gv('log-ate');
   let lista = [], origem = 'local';
   if (temDB() && SESSAO && SESSAO.token && _online) {
@@ -3548,7 +3466,7 @@ async function arquivarLogsAgora() {
 async function carregarArquivos() {
   const wrap = document.getElementById('arq-lista');
   if (!wrap) return;
-  if (!gv('arq-data')) setVal('arq-data', arqDataPadrao());
+  if (!gv('arq-data')) document.getElementById('arq-data').value = arqDataPadrao();
   if (!(temDB() && SESSAO && SESSAO.token && _online)) { wrap.innerHTML = ''; return; }
   const r = await dbCallRaw('listArchives', {});
   if (!r || !r.ok || !Array.isArray(r.arquivos)) { wrap.innerHTML = ''; return; }
