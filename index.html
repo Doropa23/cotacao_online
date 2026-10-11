@@ -1120,10 +1120,15 @@ function enfileirar(action, payload) {
   setFila(f);
   atualizarBannerOffline();
 }
+let _escritasEmCurso = 0;
 async function dbCall(action, payload) {
-  const r = await dbCallRaw(action, payload);
-  if (r === null && ESCRITAS[action] && temDB()) enfileirar(action, payload || {});
-  return r;
+  if (!ESCRITAS[action]) return dbCallRaw(action, payload);
+  _escritasEmCurso++;
+  try {
+    const r = await dbCallRaw(action, payload);
+    if (r === null && temDB()) enfileirar(action, payload || {});
+    return r;
+  } finally { _escritasEmCurso--; }
 }
 function marcarOnline() {
   const estavaOffline = !_online;
@@ -1311,19 +1316,13 @@ async function ligarBaseDados() {
   } else showToast('❌ Falha ao ligar.');
 }
 async function sincronizarTudo(silencioso) {
-  if (!temDB() || !SESSAO) return;
+  if (!temDB() || !SESSAO || _escritasEmCurso) return;
   const filaOk = await esvaziarFila();
   if (!filaOk && getFila().length) { setDbStatus(false, `${getFila().length} por enviar`); return; }
   enviarLogs();
   const r = await dbCallRaw('getAll', {});
   if (!r || !r.ok) { setDbStatus(false, 'Falha ao sincronizar.'); return; }
   if (getFila().length) return;
-  if (!localStorage.getItem('migracaoFila') && Array.isArray(r.cotacoes)) {
-    const remotas = new Set(r.cotacoes.map(c => String(c.num)));
-    JSON.parse(localStorage.getItem('cotacoes') || '[]').forEach(c => { if (!remotas.has(String(c.num)) && (pode('todasCot') || c.criadoPor === SESSAO.username)) enfileirar('saveCotacao', { cotacao: c }); });
-    localStorage.setItem('migracaoFila', '1');
-    if (getFila().length) { esvaziarFila().then(() => sincronizarTudo()); return; }
-  }
   if (r.config) {
     Object.keys(r.config).forEach(k => {
       if (['cotSeq','ftSeq','vdSeq','rcSeq'].includes(k)) return;
@@ -1335,62 +1334,25 @@ async function sincronizarTudo(silencioso) {
     SESSAO.role = r.eu.role; SESSAO.nome = r.eu.nome;
     aplicarPermissoes();
   }
-  const localDe = k => { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };
-  const avisos = [];
-  if (Array.isArray(r.clientes)) {
-    if (r.clientes.length || !localDe('clientes').length) {
-      localStorage.setItem('clientes', JSON.stringify(r.clientes.map(c => ({
-        id: normId(c.id),
-        nome: String(c.nome == null ? '' : c.nome),
-        nuit: String(c.nuit == null ? '' : c.nuit),
-        end: String(c.end == null ? '' : c.end),
-        cidade: String(c.cidade == null ? '' : c.cidade),
-        tel: String(c.tel == null ? '' : c.tel),
-        email: String(c.email == null ? '' : c.email),
-        criadoEm: c.criadoEm || '',
-        atualizadoEm: c.atualizadoEm || '',
-        criadoAuto: c.criadoAuto || ''
-      }))));
-    } else { avisos.push('clientes'); localDe('clientes').forEach(c => dbCall('saveCliente', { cliente: c })); }
-  }
-  if (Array.isArray(r.produtos)) {
-    if (r.produtos.length || !localDe('produtos').length) {
-      localStorage.setItem('produtos', JSON.stringify(r.produtos.map(normProd)));
-    } else { avisos.push('produtos'); localDe('produtos').forEach(p => dbCall('saveProduto', { produto: p })); }
-  }
-  if (Array.isArray(r.cotacoes)) {
-    if (r.cotacoes.length || !localDe('cotacoes').length) {
-      const cots = r.cotacoes.map(c => ({
-        ...c, num: String(c.num == null ? '' : c.num), sub: +c.sub || 0, iva: +c.iva || 0, total: +c.total || 0,
-        moeda: c.moeda || 'MT', obs: c.obs ? String(c.obs) : '', items: Array.isArray(c.items) ? c.items : []
-      })).filter(c => c.num);
-      localStorage.setItem('cotacoes', JSON.stringify(cots));
-    } else { avisos.push('cotações'); localDe('cotacoes').forEach(c => dbCall('saveCotacao', { cotacao: c })); }
-  }
-  if (Array.isArray(r.documentos)) mesclarDocumentos(r.documentos);
-  if (Array.isArray(r.movstock)) {
-    const mm = {};
-    getMovs().forEach(m => { mm[m.id] = m; });
-    r.movstock.forEach(m => { if (!mm[m.id]) mm[m.id] = m; });
-    setMovs(Object.values(mm).sort((a,b) => String(b.ts||'').localeCompare(String(a.ts||''))).slice(0, 5000));
-  }
-  ['FT','VD','RC'].forEach(t => {
-    const k = TIPOS_DOC[t].seq;
-    const rem = parseInt((r.config && r.config[k]) || 0) || 0;
-    const fin = Math.max(rem, seqMaximoDoc(t));
-    if (fin > (parseInt(localStorage.getItem(k) || 0) || 0)) localStorage.setItem(k, fin);
-    if (fin > rem) dbCall('saveConfig', { config: { [k]: String(fin) } });
-  });
-  const seqRemoto = parseInt((r.config && r.config.cotSeq) || 0) || 0;
-  const seqFinal = Math.max(seqRemoto, seqMaximo());
-  const seqLocal = parseInt(localStorage.getItem('cotSeq') || 0) || 0;
-  if (seqFinal > seqLocal) localStorage.setItem('cotSeq', seqFinal);
-  if (seqFinal > seqRemoto) dbCall('saveConfig', { config: { cotSeq: String(seqFinal) } });
+  const guardar = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+  if (Array.isArray(r.clientes)) guardar('clientes', r.clientes.map(c => ({
+    id: normId(c.id), nome: String(c.nome == null ? '' : c.nome), nuit: String(c.nuit == null ? '' : c.nuit), end: String(c.end == null ? '' : c.end),
+    cidade: String(c.cidade == null ? '' : c.cidade), tel: String(c.tel == null ? '' : c.tel), email: String(c.email == null ? '' : c.email),
+    criadoEm: c.criadoEm || '', atualizadoEm: c.atualizadoEm || '', criadoAuto: c.criadoAuto || '' })));
+  if (Array.isArray(r.produtos)) guardar('produtos', r.produtos.map(normProd));
+  if (Array.isArray(r.cotacoes)) guardar('cotacoes', r.cotacoes.map(c => ({
+    ...c, num: String(c.num == null ? '' : c.num), sub: +c.sub || 0, iva: +c.iva || 0, total: +c.total || 0,
+    moeda: c.moeda || 'MT', obs: c.obs ? String(c.obs) : '', items: Array.isArray(c.items) ? c.items : [] })).filter(c => c.num));
+  if (Array.isArray(r.documentos)) setDocs(r.documentos.map(normDoc).filter(d => d.id).sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || ''))));
+  if (Array.isArray(r.movstock)) setMovs(r.movstock.slice().sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || ''))).slice(0, 5000));
+  /* Numeração: o servidor atribui FT/VD/RC; localmente só se acompanha o valor do servidor */
+  ['FT','VD','RC'].forEach(t => { const k = TIPOS_DOC[t].seq; localStorage.setItem(k, Math.max(parseInt((r.config && r.config[k]) || 0) || 0, seqMaximoDoc(t))); });
+  localStorage.setItem('cotSeq', Math.max(parseInt((r.config && r.config.cotSeq) || 0) || 0, seqMaximo()));
   if (_numAuto && gv('cot-num') === _numAuto) autoNum();
   const nR = k => Array.isArray(r[k]) ? r[k].length : 0;
   setDbStatus(true, `Ligado. BD: ${nR('cotacoes')} cotações · ${nR('clientes')} clientes · ${nR('produtos')} produtos · ${nR('documentos')} documentos · ${nR('movstock')} movimentos` +
-    (r.versao ? ` (script ${r.versao})` : '') + (avisos.length ? `. ⚠️ BD devolveu ${avisos.join(', ')} vazios; dados locais mantidos.` : '.'));
-  if (!silencioso || avisos.length) showToast(avisos.length ? '⚠️ Dados locais mantidos para ' + avisos.join(', ') : '🔄 Sincronização concluída!');
+    (r.versao ? ` (script ${r.versao})` : '') + '.');
+  if (!silencioso) showToast('🔄 Sincronização concluída!');
   const ativo = painelActivo();
   if (ativo === 'guardadas') renderCotList();
   if (ativo === 'produtos') renderProdList();
@@ -2522,18 +2484,6 @@ function normDoc(x) {
   ['obs','metodo','origem','facturaId','estado','cond','venc','tempo','validade'].forEach(k => { if (o[k] == null) o[k] = ''; });
   return o;
 }
-function mesclarDocumentos(remotos) {
-  const mapa = {};
-  remotos.forEach(x => { const o = normDoc(x); if (o.id) mapa[o.id] = o; });
-  const aEnviar = [];
-  getDocs().forEach(l => {
-    const r = mapa[l.id];
-    if (!r) { mapa[l.id] = l; aEnviar.push(l); }
-    else if ((l.atualizadoEm || '') > (r.atualizadoEm || '')) { mapa[l.id] = l; aEnviar.push(l); }
-  });
-  setDocs(Object.values(mapa).sort((a, b) => String(b.savedAt || '').localeCompare(String(a.savedAt || ''))));
-  if (temDB()) aEnviar.forEach(x => dbCall('saveDocumento', { documento: x }));
-}
 function prefixoDoc(tipo) { const v = localStorage.getItem(TIPOS_DOC[tipo].cfg); return (v === null || v === '') ? TIPOS_DOC[tipo].pref : v; }
 function seqMaximoDoc(tipo) {
   let max = parseInt(localStorage.getItem(TIPOS_DOC[tipo].seq) || 0) || 0;
@@ -2543,7 +2493,7 @@ function seqMaximoDoc(tipo) {
 function registarSeqDoc(tipo, n) {
   const k = TIPOS_DOC[tipo].seq;
   const atual = parseInt(localStorage.getItem(k) || 0) || 0;
-  if (n > atual) { localStorage.setItem(k, n); if (temDB()) dbCall('saveConfig', { config: { [k]: String(n) } }); }
+  if (n > atual) localStorage.setItem(k, n);
 }
 function proximoNumDoc(tipo) {
   const h = new Date();
