@@ -183,6 +183,42 @@ body.locked{overflow:hidden}
 #conn-status.ok .dot{background:#0d6e3f}
 #conn-status.err .dot{background:#c0392b}
 #conn-status.warn .dot{background:#b45309}
+
+/* ═══ DIÁLOGOS DA APP (substituem alert/confirm do navegador) ═══ */
+.ui-ov{position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px);z-index:99000;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;transition:opacity .18s}
+.ui-ov.show{opacity:1}
+.ui-dlg{--c:var(--blue);--cb:#e8f0fb;background:#fff;border-radius:14px;width:100%;max-width:440px;box-shadow:0 20px 50px rgba(15,23,42,.28);overflow:hidden;transform:translateY(12px) scale(.97);transition:transform .22s cubic-bezier(.2,.9,.3,1.15)}
+.ui-ov.show .ui-dlg{transform:none}
+.ui-dlg.t-danger{--c:#c0392b;--cb:#fdecea}
+.ui-dlg.t-warn{--c:#b45309;--cb:#fff4e0}
+.ui-dlg.t-success{--c:#0d6e3f;--cb:#e8f8ef}
+.ui-top{height:4px;background:var(--c)}
+.ui-head{display:flex;gap:14px;align-items:flex-start;padding:20px 22px 4px}
+.ui-ico{flex:0 0 42px;height:42px;border-radius:50%;background:var(--cb);color:var(--c);display:flex;align-items:center;justify-content:center}
+.ui-ico svg{width:21px;height:21px}
+.ui-title{font-size:15px;font-weight:700;color:var(--text);margin-top:3px}
+.ui-msg{font-size:13px;color:var(--muted);line-height:1.55;margin-top:5px;white-space:pre-line;word-break:break-word}
+.ui-list{margin:10px 0 0;padding:10px 12px 10px 28px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12.5px;color:var(--text);max-height:240px;overflow:auto;line-height:1.5}
+.ui-list li{margin:3px 0}
+.ui-foot{display:flex;justify-content:flex-end;gap:9px;padding:16px 22px 20px;flex-wrap:wrap}
+.ui-dlg .btn{padding:9px 20px;justify-content:center}
+.ui-dlg .btn:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(26,79,160,.25)}
+@media(max-width:480px){.ui-foot .btn{flex:1}}
+/* Modal de documentos do cliente */
+.dc-head{display:flex;gap:12px;align-items:center;margin-bottom:14px;padding-right:34px}
+.dc-av{flex:0 0 44px;height:44px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px}
+.dc-head h3{margin:0 !important;padding:0 !important}
+.dc-sub{font-size:11.5px;color:var(--muted);margin-top:2px}
+.dc-body{max-height:56vh;overflow:auto;padding-right:2px}
+.dc-sec{font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:16px 0 8px;display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px}
+.dc-sec:first-child{margin-top:0}
+.dc-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:#fff;cursor:pointer;transition:all .15s}
+.dc-row:hover{border-color:var(--blue);background:var(--accent);box-shadow:var(--shadow)}
+.dc-row.anul{opacity:.6}.dc-row.anul .dc-val{text-decoration:line-through}
+.dc-num{font-weight:700;font-size:12.5px;color:var(--blue)}
+.dc-info{font-size:11px;color:var(--muted);margin-top:2px}
+.dc-val{margin-left:auto;font-weight:700;font-size:12.5px;white-space:nowrap}
+.dc-vazio{font-size:12px;color:var(--muted);text-align:center;padding:14px;background:var(--bg);border-radius:8px}
 </style>
 </head>
 <body class="locked">
@@ -596,7 +632,7 @@ body.locked{overflow:hidden}
     <div class="field"><label>Stock mínimo</label><input type="number" id="prod-stockmin" value="0" step="0.01"></div>
     <div class="field s2"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-weight:600;color:var(--text);font-size:13px"><input type="checkbox" id="prod-rastrear" checked> Controlar stock deste produto</label></div>
   </div>
-  <div class="btn-bar"><button class="btn btn-primary" onclick="salvarProduto()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+  <div class="btn-bar"><button class="btn btn-primary" id="btn-prod-ok" onclick="salvarProduto()">Guardar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
 </div></div>
 
 <div class="modal-bg" id="modal-movstock"><div class="modal">
@@ -614,7 +650,15 @@ body.locked{overflow:hidden}
     <div class="field s2"><label>Motivo</label><input type="text" id="mov-motivo" placeholder="Ex.: Compra ao fornecedor ABC"></div>
   </div>
   <div class="alert alert-info" id="mov-preview" style="font-size:12px;margin-top:10px;display:none"></div>
-  <div class="btn-bar"><button class="btn btn-primary" onclick="confirmarMovStock()">Registar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+  <div class="btn-bar"><button class="btn btn-primary" id="btn-mov-ok" onclick="confirmarMovStock()">Registar</button><button class="btn btn-secondary" onclick="fecharModal()">Cancelar</button></div>
+</div></div>
+
+<div class="modal-bg" id="modal-docs-cliente"><div class="modal" style="max-width:620px">
+  <button type="button" class="modal-close" onclick="fecharModal()" title="Fechar">×</button>
+  <div class="dc-head"><div class="dc-av" id="dc-av"></div><div style="min-width:0"><h3 id="dc-nome"></h3><div class="dc-sub" id="dc-sub"></div></div></div>
+  <div class="kpi-grid" id="dc-kpis" style="grid-template-columns:repeat(3,1fr)"></div>
+  <div class="dc-body" id="dc-body"></div>
+  <div class="btn-bar"><button class="btn btn-secondary" onclick="fecharModal()">Fechar</button></div>
 </div></div>
 
 <div class="modal-bg" id="modal-histstock"><div class="modal" style="max-width:820px">
@@ -829,8 +873,8 @@ function reiniciarTimerInatividade() {
   _inactivityTimer = setTimeout(() => {
     if (SESSAO) {
       try { registarLog('AUTH_INATIVIDADE', 'Sessão', SESSAO.username, 'Sessão encerrada por inatividade'); } catch(e){}
-      alert('A sessão foi encerrada automaticamente após 30 minutos de inatividade.');
       terminarSessaoSilencioso();
+      uiAlert('A sessão foi encerrada automaticamente após 30 minutos de inatividade. Inicie sessão novamente para continuar.', { titulo: 'Sessão terminada', tipo: 'info' });
     }
   }, INACTIVITY_MS);
 }
@@ -936,8 +980,8 @@ function terminarSessaoSilencioso() {
   if (tk) dbCallRaw('logout', { token: tk });
   mostrarLogin();
 }
-function terminarSessao() {
-  if (!confirm('Terminar sessão?')) return;
+async function terminarSessao() {
+  if (!(await uiConfirm('Tem a certeza de que pretende terminar a sessão?', { titulo: 'Terminar sessão', tipo: 'question', okText: 'Terminar sessão' }))) return;
   registarLog('AUTH_LOGOUT', 'Sessão', SESSAO ? SESSAO.username : '', 'Fim de sessão');
   const tk = SESSAO && SESSAO.token;
   if (tk) setTimeout(() => dbCallRaw('logout', { token: tk }), 300);
@@ -1010,10 +1054,10 @@ function mascararUrl(u) {
   } catch(e) { return 'https://••••••••/exec'; }
 }
 let _dbUrlVisivel = false;
-function alternarEdicaoDB() {
+async function alternarEdicaoDB() {
   const inp = document.getElementById('cfg-db-url'), btn = document.getElementById('btn-edit-db');
   if (!_dbUrlVisivel) {
-    if (!confirm('Tem a certeza? O URL ficará visível no ecrã.')) return;
+    if (!(await uiConfirm('O URL de ligação à base de dados ficará visível no ecrã. Continuar?', { titulo: 'Mostrar URL', tipo: 'warn', okText: 'Mostrar' }))) return;
     _dbUrlVisivel = true;
     inp.value = getDbUrl(); inp.readOnly = false; inp.style.background = '#fff'; inp.style.color = '';
     btn.textContent = 'Ocultar';
@@ -1233,7 +1277,7 @@ function normId(id) { return (typeof id === 'number') ? id : (isNaN(+id) ? id : 
   Storage.prototype.setItem = function (k, v) {
     try { return original.call(this, k, v); }
     catch (e) {
-      if (!avisado) { avisado = true; setTimeout(() => { avisado = false; }, 30000); alert('⚠️ Armazenamento cheio.'); }
+      if (!avisado) { avisado = true; setTimeout(() => { avisado = false; }, 30000); uiAlert('O armazenamento do navegador está cheio. Liberte espaço (por exemplo, apagando cotações antigas) para continuar a guardar dados.', { titulo: 'Armazenamento cheio', tipo: 'warn' }); }
       throw e;
     }
   };
@@ -1748,7 +1792,7 @@ function abrirClienteModal(id) {
   document.getElementById('modal-cliente-edit').classList.add('open');
 }
 
-function salvarClienteEdit() {
+async function salvarClienteEdit() {
   const erro = document.getElementById('cliedit-erro');
   const nome = document.getElementById('cliedit-nome').value.trim();
   if (!nome) { erro.textContent = 'O nome é obrigatório.'; erro.style.display = 'block'; return; }
@@ -1764,7 +1808,7 @@ function salvarClienteEdit() {
   };
   const key = nome.toLowerCase();
   const duplicado = lista.find(c => c.id !== +id && String(c.nome||'').trim().toLowerCase() === key);
-  if (duplicado && !confirm(`Já existe um cliente com o nome "${duplicado.nome}". Guardar mesmo assim?`)) return;
+  if (duplicado && !(await uiConfirm(`Já existe um cliente com o nome "${duplicado.nome}". Guardar mesmo assim?`, { titulo: 'Cliente duplicado', tipo: 'warn', okText: 'Guardar mesmo assim' }))) return;
   let cli;
   if (id) {
     cli = lista.find(x => x.id === +id);
@@ -1783,11 +1827,11 @@ function salvarClienteEdit() {
   showToast('Cliente guardado!');
 }
 
-function apagarClienteById(id) {
+async function apagarClienteById(id) {
   const lista = getClientes();
   const c = lista.find(x => x.id === id);
   if (!c) return;
-  if (!confirm(`Apagar o cliente "${c.nome}"?`)) return;
+  if (!(await uiConfirm(`Apagar o cliente "${c.nome}"? Esta acção não pode ser anulada.`, { titulo: 'Apagar cliente', tipo: 'danger', okText: 'Apagar' }))) return;
   const nova = lista.filter(x => x.id !== id);
   setClientes(nova);
   registarLog('CLI_APAGAR', 'Cliente', c.nome, '');
@@ -1816,12 +1860,31 @@ function verDocsDoCliente(nome) {
   const k = String(nome || '').trim().toLowerCase();
   const cots = JSON.parse(localStorage.getItem('cotacoes') || '[]').filter(c => String(c.cliNome || '').trim().toLowerCase() === k);
   const docs = getDocs().filter(d => String(d.cliNome || '').trim().toLowerCase() === k);
-  let txt = `Documentos de "${nome}"\n\n`;
-  txt += `Cotações (${cots.length}):\n`;
-  cots.slice(0, 10).forEach(c => { txt += `  • ${c.num} — ${fmtDate(c.data)} — ${fmt(c.total)} ${c.moeda || 'MT'}\n`; });
-  txt += `\nDocumentos emitidos (${docs.length}):\n`;
-  docs.slice(0, 10).forEach(d => { txt += `  • [${d.tipo}] ${d.num} — ${fmtDate(d.data)} — ${fmt(d.total)} ${d.moeda}\n`; });
-  alert(txt);
+  const fact = {};
+  docs.filter(d => (d.tipo === 'FT' || d.tipo === 'VD') && d.estado !== 'Anulado').forEach(d => {
+    const m = d.moeda || 'MT'; fact[m] = (fact[m] || 0) + (+d.total || 0);
+  });
+  const factTxt = Object.keys(fact).length ? Object.keys(fact).map(m => fmt(fact[m]) + ' ' + m).join(' · ') : '—';
+  document.getElementById('dc-av').textContent = (String(nome || '?').trim().charAt(0) || '?').toUpperCase();
+  document.getElementById('dc-nome').textContent = nome || '—';
+  document.getElementById('dc-sub').textContent = 'Histórico de cotações e documentos emitidos';
+  document.getElementById('dc-kpis').innerHTML =
+    `<div class="kpi b"><div class="k-l">Cotações</div><div class="k-v">${cots.length}</div></div>` +
+    `<div class="kpi"><div class="k-l">Documentos</div><div class="k-v">${docs.length}</div></div>` +
+    `<div class="kpi g"><div class="k-l">Facturado</div><div class="k-v" style="font-size:14px">${esc(factTxt)}</div></div>`;
+  const linhaCot = c => `<div class="dc-row" onclick="fecharModal();previewCotacao(${jsq(c.num)})" title="Abrir cotação">
+      <div style="min-width:0"><div class="dc-num">${esc(c.num)}</div><div class="dc-info">${esc(fmtDate(c.data))}</div></div>
+      <div class="dc-val">${fmt(c.total)} ${esc(c.moeda || 'MT')}</div></div>`;
+  const linhaDoc = d => `<div class="dc-row ${d.estado === 'Anulado' ? 'anul' : ''}" onclick="fecharModal();previewDoc(${jsq(encodeURIComponent(d.id))})" title="Abrir documento">
+      <span class="tag tag-${esc(d.tipo)}">${esc(d.tipo)}</span>
+      <div style="min-width:0"><div class="dc-num">${esc(d.num)}</div><div class="dc-info">${esc(fmtDate(d.data))}${d.estado ? ' · ' + esc(d.estado) : ''}</div></div>
+      <div class="dc-val">${fmt(d.total)} ${esc(d.moeda || 'MT')}</div></div>`;
+  document.getElementById('dc-body').innerHTML =
+    `<div class="dc-sec"><span>Cotações</span><span>${cots.length}</span></div>` +
+    (cots.length ? cots.map(linhaCot).join('') : '<div class="dc-vazio">Sem cotações para este cliente.</div>') +
+    `<div class="dc-sec"><span>Documentos emitidos</span><span>${docs.length}</span></div>` +
+    (docs.length ? docs.map(linhaDoc).join('') : '<div class="dc-vazio">Sem documentos emitidos.</div>');
+  document.getElementById('modal-docs-cliente').classList.add('open');
 }
 
 function abrirModalClientes() {
@@ -1872,7 +1935,7 @@ function renderAlertasStock() {
 function abrirMovStock(prodId) {
   const prods = getProdutos();
   if (!prods.length) { showToast('⚠️ Não há produtos.'); return; }
-  const p = prodId ? prods.find(x => x.id === prodId) : null;
+  const p = prodId ? prods.find(x => String(x.id) === String(prodId)) : null;
   if (!p) { showToast('⚠️ Escolha um produto.'); return; }
   document.getElementById('mov-prod-id').value = p.id;
   document.getElementById('mov-titulo').textContent = 'Movimento — ' + (p.ref || p.desc);
@@ -1898,15 +1961,17 @@ function descMovTipo() {
   pv.textContent = `Stock: ${fmt(p.stock)} → ${fmt(depois)}`;
   pv.style.display = 'block';
 }
+let _movEmCurso = false;
 async function confirmarMovStock() {
+  if (_movEmCurso) return;                       // evita registar duas vezes com duplo clique
   const prodId = gv('mov-prod-id');
   if (!prodId) { showToast('⚠️ Escolha o produto.'); return; }
-  const prods = getProdutos();
-  const p = prods.find(x => String(x.id) === String(prodId));
+  const p = getProdutos().find(x => String(x.id) === String(prodId));
   if (!p) { showToast('⚠️ Produto não encontrado.'); return; }
   const tipo = gv('mov-tipo');
   const qtdIn = parseFloat(gv('mov-qtd')) || 0;
   if (tipo !== 'AJUSTE' && !qtdIn) { showToast('⚠️ Quantidade inválida.'); return; }
+  if (tipo === 'AJUSTE' && qtdIn < 0) { showToast('⚠️ O stock não pode ser negativo.'); return; }
   const antes = +p.stock || 0;
   let delta, depois;
   if (tipo === 'ENTRADA') { delta = Math.abs(qtdIn); depois = antes + delta; }
@@ -1919,15 +1984,29 @@ async function confirmarMovStock() {
     tipo, qtd: delta, qtdAntes: antes, qtdDepois: depois,
     motivo: gv('mov-motivo') || '', refDoc: '', obs: '', origem: 'app'
   };
-  p.stock = depois; p.stockAtualizadoEm = mov.ts;
-  setProdutos(prods);
-  const movs = getMovs(); movs.unshift(mov); setMovs(movs);
-  registarLog('STOCK_' + tipo, 'Produto', p.ref || p.desc, `${delta>0?'+':''}${delta} · ${antes} → ${depois}`);
-  if (temDB()) { await dbCall('saveMovStock', { movimento: mov }); await dbCall('saveProduto', { produto: p }); }
-  fecharModal();
-  showToast(`Stock: ${fmt(antes)} → ${fmt(depois)}`);
-  renderProdList();
-  setTimeout(sincronizarTudo, 500);
+  const btn = document.getElementById('btn-mov-ok');
+  _movEmCurso = true; btnBusy(btn, true, 'A registar…');
+  try {
+    let movFinal = mov, stockFinal = depois;
+    if (temDB()) {
+      // O servidor aplica o movimento ao stock real (evita sobrepor vendas de outros utilizadores)
+      const r = await dbCall('saveMovStock', { movimento: mov });
+      if (!r) { await uiAlert('Sem ligação ao servidor. O movimento não foi registado — tente novamente quando a ligação estiver restabelecida.', { titulo: 'Movimento não registado', tipo: 'error' }); return; }
+      if (!r.ok) { if (r.code !== 'AUTH') await uiAlert(r.error || 'Erro ao registar o movimento.', { titulo: 'Movimento não registado', tipo: 'error' }); return; }
+      if (r.movimento) movFinal = r.movimento;
+      if (r.produto) stockFinal = +r.produto.stock || 0;
+    }
+    const prods = getProdutos();
+    const p2 = prods.find(x => String(x.id) === String(prodId));
+    if (p2) { p2.stock = stockFinal; p2.stockAtualizadoEm = movFinal.ts; setProdutos(prods); }
+    const movs = getMovs();
+    if (!movs.some(m => m.id === movFinal.id)) { movs.unshift(movFinal); setMovs(movs); }
+    const dl = +movFinal.qtd || 0;
+    registarLog('STOCK_' + tipo, 'Produto', p.ref || p.desc, `${dl>0?'+':''}${dl} · ${movFinal.qtdAntes} → ${movFinal.qtdDepois}`);
+    fecharModal();
+    showToast(`Stock: ${fmt(movFinal.qtdAntes)} → ${fmt(movFinal.qtdDepois)}`);
+    renderProdList();
+  } finally { _movEmCurso = false; btnBusy(btn, false); }
 }
 function abrirMovHist(prodId) { document.getElementById('hist-q').value = ''; document.getElementById('modal-histstock').classList.add('open'); renderHistStock(prodId); }
 function renderHistStock(prodIdFiltro) {
@@ -2001,7 +2080,9 @@ function filtrarProdList(q) {
       </div></div>`;
   }).join('');
 }
+let _prodStockOrig = null, _prodEmCurso = false;
 function abrirModalNovoProduto() {
+  _prodStockOrig = null;
   document.getElementById('modal-prod-titulo').textContent = 'Novo Produto';
   document.getElementById('prod-edit-id').value = '';
   ['prod-ref','prod-desc'].forEach(f=>document.getElementById(f).value='');
@@ -2014,69 +2095,90 @@ function abrirModalNovoProduto() {
   document.getElementById('modal-novo-produto').classList.add('open');
 }
 function editarProduto(id) {
-  const p = getProdutos().find(x=>x.id===id);
+  const p = getProdutos().find(x => String(x.id) === String(id));
   if (!p) return;
+  _prodStockOrig = +p.stock || 0;
   document.getElementById('modal-prod-titulo').textContent = 'Editar Produto';
-  document.getElementById('prod-edit-id').value = id;
+  document.getElementById('prod-edit-id').value = p.id;
   document.getElementById('prod-ref').value = p.ref||'';
   document.getElementById('prod-desc').value = p.desc||'';
   document.getElementById('prod-pu').value = p.pu||0;
   document.getElementById('prod-un').value = p.un||'Un';
-  document.getElementById('prod-iva').value = p.iva||16;
-  document.getElementById('prod-stock').value = (+p.stock || 0);
+  // IVA 0% é válido: não pode ser tratado como "vazio"
+  document.getElementById('prod-iva').value = (p.iva === 0 || p.iva === '0' || +p.iva > 0) ? String(+p.iva) : '16';
+  document.getElementById('prod-stock').value = _prodStockOrig;
   document.getElementById('prod-stockmin').value = (+p.stockMin || 0);
   document.getElementById('prod-rastrear').checked = p.rastrear !== 'nao';
   document.getElementById('modal-novo-produto').classList.add('open');
 }
-function salvarProduto() {
+async function salvarProduto() {
+  if (_prodEmCurso) return;
   const ref  = document.getElementById('prod-ref').value.trim();
   const desc = document.getElementById('prod-desc').value.trim();
   if (!ref && !desc) { showToast('⚠️ Preencha ref. ou descrição.'); return; }
-  let prods = getProdutos();
   const editId = document.getElementById('prod-edit-id').value;
   const stNovo = parseFloat(document.getElementById('prod-stock').value) || 0;
-  const anterior = editId ? prods.find(p => p.id === +editId) : null;
+  if (stNovo < 0) { showToast('⚠️ O stock não pode ser negativo.'); return; }
+  const prods = getProdutos();
+  const anterior = editId ? prods.find(p => String(p.id) === String(editId)) : null;
+  if (editId && !anterior) { showToast('⚠️ Produto não encontrado.'); return; }
   const stAntes = anterior ? (+anterior.stock || 0) : 0;
+  // Só conta como ajuste se o utilizador mexeu mesmo no campo (evita sobrepor vendas feitas entretanto)
+  const stockAlterado = anterior ? (stNovo !== _prodStockOrig) : stNovo > 0;
+  const ivaN = parseInt(document.getElementById('prod-iva').value);
+  const agora = new Date().toISOString();
   const prod = {
-    id: editId ? +editId : Date.now(),
+    id: anterior ? anterior.id : Date.now(),
     ref, desc,
     un:  document.getElementById('prod-un').value,
     pu:  parseFloat(document.getElementById('prod-pu').value)||0,
-    iva: parseInt(document.getElementById('prod-iva').value)||16,
-    stock: stNovo,
+    iva: isNaN(ivaN) ? 16 : ivaN,
+    stock: anterior ? (stockAlterado ? stNovo : stAntes) : stNovo,
     stockMin: parseFloat(document.getElementById('prod-stockmin').value) || 0,
     rastrear: document.getElementById('prod-rastrear').checked ? 'sim' : 'nao',
-    stockAtualizadoEm: new Date().toISOString()
+    stockAtualizadoEm: stockAlterado ? agora : ((anterior && anterior.stockAtualizadoEm) || agora)
   };
-  if (editId) { const i=prods.findIndex(p=>p.id===+editId); if(i>=0) prods[i]=prod; }
-  else prods.unshift(prod);
-  setProdutos(prods);
-  registarLog(editId ? 'PROD_EDITAR' : 'PROD_CRIAR', 'Produto', ref || desc, `${desc} · Stock ${fmt(prod.stock)}`);
+  let mov = null;
   if (!anterior && stNovo > 0) {
-    const mov = { id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
-      produtoId: prod.id, produtoRef: prod.ref, produtoDesc: prod.desc, tipo: 'INICIAL',
-      qtd: stNovo, qtdAntes: 0, qtdDepois: stNovo, motivo: 'Stock inicial', refDoc: '', obs: '', origem: 'app' };
-    const ms = getMovs(); ms.unshift(mov); setMovs(ms);
-    if (temDB()) dbCall('saveMovStock', { movimento: mov });
-  } else if (anterior && stNovo !== stAntes) {
-    const delta = stNovo - stAntes;
-    const mov = { id: novoUid(), ts: new Date().toISOString(), user: (SESSAO && SESSAO.username) || '',
-      produtoId: prod.id, produtoRef: prod.ref, produtoDesc: prod.desc, tipo: 'AJUSTE',
-      qtd: delta, qtdAntes: stAntes, qtdDepois: stNovo, motivo: 'Ajuste na ficha', refDoc: '', obs: '', origem: 'app' };
-    const ms = getMovs(); ms.unshift(mov); setMovs(ms);
-    if (temDB()) dbCall('saveMovStock', { movimento: mov });
+    mov = { id: novoUid(), ts: agora, user: (SESSAO && SESSAO.username) || '', produtoId: prod.id, produtoRef: ref, produtoDesc: desc,
+      tipo: 'INICIAL', qtd: stNovo, qtdAntes: 0, qtdDepois: stNovo, motivo: 'Stock inicial', refDoc: '', obs: '', origem: 'app' };
+  } else if (anterior && stockAlterado) {
+    mov = { id: novoUid(), ts: agora, user: (SESSAO && SESSAO.username) || '', produtoId: prod.id, produtoRef: ref, produtoDesc: desc,
+      tipo: 'AJUSTE', qtd: stNovo - stAntes, qtdAntes: stAntes, qtdDepois: stNovo, motivo: 'Ajuste na ficha', refDoc: '', obs: '', origem: 'app' };
   }
-  fecharModal();
-  renderProdList();
-  showToast('Produto guardado!');
-  if (temDB()) dbCall('saveProduto', { produto: prod });
+  const btn = document.getElementById('btn-prod-ok');
+  _prodEmCurso = true; btnBusy(btn, true, 'A guardar…');
+  try {
+    let prodFinal = prod, movFinal = mov;
+    if (temDB()) {
+      const r = await dbCall('saveProduto', { produto: prod, movimento: mov });
+      if (!r) { await uiAlert('Sem ligação ao servidor. O produto não foi guardado — tente novamente quando a ligação estiver restabelecida.', { titulo: 'Não foi possível guardar', tipo: 'error' }); return; }
+      if (!r.ok) { if (r.code !== 'AUTH') await uiAlert(r.error || 'Erro ao guardar o produto.', { titulo: 'Não foi possível guardar', tipo: 'error' }); return; }
+      if (r.produto) prodFinal = Object.assign({}, prod, r.produto, { id: normId(r.produto.id), stock: +r.produto.stock || 0, pu: +r.produto.pu || 0, iva: +r.produto.iva || 0, stockMin: +r.produto.stockMin || 0 });
+      if (r.movimento) movFinal = r.movimento;
+    }
+    const lista = getProdutos();
+    const i = lista.findIndex(p => String(p.id) === String(prodFinal.id));
+    if (i >= 0) lista[i] = prodFinal; else lista.unshift(prodFinal);
+    setProdutos(lista);
+    if (movFinal) {
+      const ms = getMovs();
+      if (!ms.some(m => m.id === movFinal.id)) { ms.unshift(movFinal); setMovs(ms); }
+    }
+    registarLog(anterior ? 'PROD_EDITAR' : 'PROD_CRIAR', 'Produto', ref || desc, `${desc} · Stock ${fmt(prodFinal.stock)}`);
+    fecharModal();
+    renderProdList();
+    showToast('Produto guardado!');
+  } finally { _prodEmCurso = false; btnBusy(btn, false); }
 }
-function apagarProduto(id) {
-  if (!confirm('Apagar este produto?')) return;
-  { const pr = getProdutos().find(p=>p.id===id); registarLog('PROD_APAGAR', 'Produto', pr ? (pr.ref || pr.desc) : id, ''); }
-  setProdutos(getProdutos().filter(p=>p.id!==id));
+async function apagarProduto(id) {
+  const pr = getProdutos().find(p => String(p.id) === String(id));
+  if (!pr) return;
+  if (!(await uiConfirm(`Apagar o produto "${pr.ref || pr.desc}"? Esta acção não pode ser anulada.`, { titulo: 'Apagar produto', tipo: 'danger', okText: 'Apagar' }))) return;
+  registarLog('PROD_APAGAR', 'Produto', pr.ref || pr.desc || id, '');
+  setProdutos(getProdutos().filter(p => String(p.id) !== String(id)));
   renderProdList();
-  if (temDB()) dbCall('deleteProduto', { id });
+  if (temDB()) dbCall('deleteProduto', { id: pr.id });
 }
 function abrirProdSel(itemId) {
   _itemParaSel = itemId;
@@ -2179,8 +2281,8 @@ function resolverNumCot() {
 }
 async function guardarCotacao() {
   const v = validarCotacao();
-  if (v.erros.length) { alert('Não é possível guardar:\n\n• ' + v.erros.join('\n• ')); return; }
-  if (v.avisos.length && !confirm('Atenção:\n\n• ' + v.avisos.join('\n• ') + '\n\nGuardar?')) return;
+  if (v.erros.length) { await uiAlert('Corrija os pontos abaixo antes de guardar:', { titulo: 'Não é possível guardar', tipo: 'error', lista: v.erros }); return; }
+  if (v.avisos.length && !(await uiConfirm('Verifique os avisos abaixo antes de guardar:', { titulo: 'Atenção', tipo: 'warn', lista: v.avisos, okText: 'Guardar mesmo assim' }))) return;
   const r = resolverNumCot();
   if (!r.edit) {
     // Reserva o número no servidor ANTES de finalizar: nenhum outro utilizador o recebe
@@ -2298,9 +2400,9 @@ function carregarCotacao(num) {
   switchTab('cotacao');
 }
 function previewCotacao(num) { carregarCotacao(num); _docPreview = null; switchTab('preview'); }
-function apagarCotacao(num) {
+async function apagarCotacao(num) {
   if (!pode('apagarCot')) { showToast('⛔ Sem permissão.'); return; }
-  if (!confirm('Apagar a cotação '+num+'?')) return;
+  if (!(await uiConfirm('Apagar a cotação ' + num + '? Esta acção não pode ser anulada.', { titulo: 'Apagar cotação', tipo: 'danger', okText: 'Apagar' }))) return;
   registarLog('COT_APAGAR', 'Cotação', num, '');
   let cots = JSON.parse(localStorage.getItem('cotacoes')||'[]').filter(c=>c.num!==num);
   localStorage.setItem('cotacoes', JSON.stringify(cots));
@@ -2312,7 +2414,7 @@ async function apagarTodasCotacoes() {
   if (!pode('apagarTudo')) { showToast('⛔ Só master.'); return; }
   const cots = JSON.parse(localStorage.getItem('cotacoes')||'[]');
   if (!cots.length) { showToast('Sem cotações.'); return; }
-  if (!confirm(`Apagar TODAS as ${cots.length} cotações?`)) return;
+  if (!(await uiConfirm(`Vai apagar TODAS as ${cots.length} cotações guardadas. Esta acção não pode ser anulada.`, { titulo: 'Apagar todas as cotações', tipo: 'danger', okText: 'Apagar tudo' }))) return;
   registarLog('COT_APAGAR_TODAS', 'Cotação', '*', `${cots.length} apagadas`);
   localStorage.setItem('cotacoes', '[]');
   renderCotList();
@@ -2480,14 +2582,15 @@ async function abrirEmitir(tipo, ref) {
   if (tipo === 'FT' && !String(cot.cliNome || '').trim()) { showToast('⚠️ Indique o cliente.'); return; }
   const errosStock = verificarStockItens(cot.items);
   if (errosStock.length) {
-    alert('Stock insuficiente:\n\n' + errosStock.map(e =>
-      `• ${e.ref} ${e.desc}\n   Precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)} (faltam ${fmt(e.falta)})`
-    ).join('\n\n') + '\n\nVá a Produtos → Movimento para repor.');
+    await uiAlert('Vá a Produtos → Movimento para repor o stock.', {
+      titulo: 'Stock insuficiente', tipo: 'warn',
+      lista: errosStock.map(e => `${e.ref} ${e.desc} — precisa ${fmt(e.precisa)} ${e.un}, tem apenas ${fmt(e.tem)} (faltam ${fmt(e.falta)})`)
+    });
     return;
   }
   if (cot.origem) {
     const ja = getDocs().filter(d => d.origem === cot.origem && (d.tipo === 'FT' || d.tipo === 'VD') && d.estado !== 'Anulado');
-    if (ja.length && !confirm(`Esta cotação já tem ${ja[0].tipo === 'FT' ? 'a factura' : 'a VD'} ${ja[0].num}. Emitir mesmo assim?`)) return;
+    if (ja.length && !(await uiConfirm(`Esta cotação já tem ${ja[0].tipo === 'FT' ? 'a factura' : 'a VD'} ${ja[0].num}. Emitir mesmo assim?`, { titulo: 'Documento já emitido', tipo: 'warn', okText: 'Emitir mesmo assim' }))) return;
   }
   _emitir = { tipo, cot };
   document.getElementById('em-titulo').textContent = tipo === 'FT' ? 'Emitir Factura' : 'Emitir Venda a Dinheiro';
@@ -2640,13 +2743,13 @@ function previewDoc(idEnc) {
   _docPreview = d;
   switchTab('preview');
 }
-function anularDoc(idEnc) {
+async function anularDoc(idEnc) {
   if (!pode('anular')) { showToast('⛔ Só master/admin.'); return; }
   const docs = getDocs();
   const d = docs.find(x => x.id === decodeURIComponent(idEnc));
   if (!d || d.estado === 'Anulado') return;
-  if (d.tipo === 'FT' && docs.some(r => r.tipo === 'RC' && r.facturaId === d.id && r.estado !== 'Anulado')) { alert('Esta factura tem recibos. Anule primeiro os recibos.'); return; }
-  if (!confirm(`Anular ${TIPOS_DOC[d.tipo].nome} ${d.num}?`)) return;
+  if (d.tipo === 'FT' && docs.some(r => r.tipo === 'RC' && r.facturaId === d.id && r.estado !== 'Anulado')) { await uiAlert('Anule primeiro os recibos associados a esta factura.', { titulo: 'Factura com recibos', tipo: 'warn' }); return; }
+  if (!(await uiConfirm(`Anular ${TIPOS_DOC[d.tipo].nome} ${d.num}? O stock associado será reposto.`, { titulo: 'Anular documento', tipo: 'danger', okText: 'Anular' }))) return;
   d.estado = 'Anulado'; d.anuladoEm = new Date().toISOString();
 
   // Repõe exactamente o que foi abatido na emissão (com base nos movimentos VENDA do documento)
@@ -2982,7 +3085,7 @@ function limparFormSilencioso() {
   document.getElementById('cot-desc-valor').value='0';
   setDefaultDates(); autoNum(); addItem();
 }
-function limparForm() { if (!confirm('Limpar?')) return; limparFormSilencioso(); }
+async function limparForm() { if (!(await uiConfirm('Todos os campos do formulário serão limpos.', { titulo: 'Limpar formulário', tipo: 'warn', okText: 'Limpar' }))) return; limparFormSilencioso(); }
 let _numReservado = null;
 async function reservarNumeroServidor(tipo, num) {
   if (!temDB() || !SESSAO) return { num, alterado: false, offline: true };
@@ -3031,6 +3134,79 @@ function fmtDate(s){
   if (m) return `${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}-${m[3]}`;
   return s;
 }
+/* ═══════════ DIÁLOGOS DA APP ═══════════ */
+const UI_ICO = (function () {
+  const w = p => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>';
+  return {
+    info: w('<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>'),
+    question: w('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>'),
+    warn: w('<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'),
+    danger: w('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>'),
+    error: w('<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'),
+    success: w('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>')
+  };
+})();
+let _uiFila = Promise.resolve();
+function uiAbrir(o) {
+  const p = _uiFila.then(() => new Promise(resolve => {
+    const prev = document.activeElement;
+    const t = o.tipo || 'info';
+    const perigo = (t === 'danger' || t === 'error');
+    const cls = perigo ? 't-danger' : t === 'warn' ? 't-warn' : t === 'success' ? 't-success' : '';
+    const ov = document.createElement('div');
+    ov.className = 'ui-ov';
+    ov.innerHTML = `<div class="ui-dlg ${cls}" role="alertdialog" aria-modal="true">
+      <div class="ui-top"></div>
+      <div class="ui-head"><div class="ui-ico">${UI_ICO[t] || UI_ICO.info}</div>
+        <div style="min-width:0;flex:1">
+          <div class="ui-title">${esc(o.titulo || '')}</div>
+          ${o.msg ? `<div class="ui-msg">${esc(o.msg)}</div>` : ''}
+          ${o.lista && o.lista.length ? `<ul class="ui-list">${o.lista.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+        </div></div>
+      <div class="ui-foot">
+        ${o.confirmar ? `<button type="button" class="btn btn-secondary" data-r="0">${esc(o.cancelText || 'Cancelar')}</button>` : ''}
+        <button type="button" class="btn ${perigo ? 'btn-danger' : 'btn-primary'}" data-r="1">${esc(o.okText || 'OK')}</button>
+      </div></div>`;
+    document.body.appendChild(ov);
+    const botoes = Array.from(ov.querySelectorAll('button[data-r]'));
+    const fechar = r => {
+      document.removeEventListener('keydown', tecla, true);
+      ov.classList.remove('show');
+      setTimeout(() => ov.remove(), 180);
+      try { if (prev && prev.focus) prev.focus(); } catch (e) {}
+      resolve(r);
+    };
+    const tecla = e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(!o.confirmar); }
+      else if (e.key === 'Tab' && botoes.length > 1) {
+        e.preventDefault();
+        const i = botoes.indexOf(document.activeElement);
+        botoes[(i + (e.shiftKey ? botoes.length - 1 : 1)) % botoes.length].focus();
+      }
+    };
+    document.addEventListener('keydown', tecla, true);
+    ov.addEventListener('click', e => {
+      const b = e.target.closest('button[data-r]');
+      if (b) fechar(b.dataset.r === '1');
+      else if (e.target === ov && !o.confirmar) fechar(true);
+    });
+    requestAnimationFrame(() => {
+      ov.classList.add('show');
+      const alvo = (o.confirmar && perigo) ? botoes[0] : botoes[botoes.length - 1];
+      if (alvo) alvo.focus();
+    });
+  }));
+  _uiFila = p.catch(() => {});
+  return p;
+}
+function uiAlert(msg, o) { o = o || {}; return uiAbrir(Object.assign({ titulo: 'Aviso', tipo: 'info' }, o, { msg })).then(() => {}); }
+function uiConfirm(msg, o) { o = o || {}; return uiAbrir(Object.assign({ titulo: 'Confirmar', tipo: 'question', okText: 'Confirmar' }, o, { msg, confirmar: true })); }
+function btnBusy(btn, on, txt) {
+  if (!btn) return;
+  if (on) { btn.dataset.t = btn.textContent; btn.disabled = true; btn.style.opacity = '.7'; btn.textContent = txt || 'A guardar…'; }
+  else { btn.disabled = false; btn.style.opacity = ''; if (btn.dataset.t) btn.textContent = btn.dataset.t; }
+}
+
 function showToast(msg) {
   let t=document.getElementById('toast');
   if (!t) {
@@ -3270,7 +3446,8 @@ async function guardarUsuario() {
 }
 async function apagarUsuario(id) {
   const u = _usuarios.find(x => x.id === id);
-  if (!u || !confirm(`Apagar "${u.nome}" (${u.username})?`)) return;
+  if (!u) return;
+  if (!(await uiConfirm(`Apagar o utilizador "${u.nome}" (${u.username})? Esta acção não pode ser anulada.`, { titulo: 'Apagar utilizador', tipo: 'danger', okText: 'Apagar' }))) return;
   const r = await dbCall('deleteUser', { id });
   if (!r || !r.ok) { showToast('⚠️ ' + ((r && r.error) || 'Erro.')); return; }
   showToast('Utilizador apagado.');
