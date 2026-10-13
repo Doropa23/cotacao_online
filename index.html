@@ -1939,13 +1939,14 @@ function abrirMovStock(prodId) {
   if (!p) { showToast('⚠️ Escolha um produto.'); return; }
   document.getElementById('mov-prod-id').value = p.id;
   document.getElementById('mov-titulo').textContent = 'Movimento — ' + (p.ref || p.desc);
-  document.getElementById('mov-prod-info').innerHTML = `Produto: <strong>${esc(p.ref||'—')} ${esc(p.desc||'')}</strong> · Stock actual: <strong>${fmt(p.stock)}</strong>`;
+  document.getElementById('mov-prod-info').innerHTML = `Produto: <strong>${esc(p.ref||'—')} ${esc(p.desc||'')}</strong> · Stock actual: <strong>${fmt(p.stock)}</strong>${p.rastrear === 'nao' ? '<br><span style="color:var(--orange,#b45309)">O controlo de stock está desactivado neste produto — será activado ao registar uma entrada ou ajuste.</span>' : ''}`;
   document.getElementById('mov-tipo').value = 'ENTRADA';
-  document.getElementById('mov-qtd').value = '0';
+  document.getElementById('mov-qtd').value = '';
   document.getElementById('mov-motivo').value = '';
   document.getElementById('mov-preview').style.display = 'none';
   descMovTipo();
   document.getElementById('modal-movstock').classList.add('open');
+  setTimeout(() => { const q = document.getElementById('mov-qtd'); if (q) q.focus(); }, 60);
 }
 function descMovTipo() {
   const t = gv('mov-tipo');
@@ -1998,13 +1999,14 @@ async function confirmarMovStock() {
     }
     const prods = getProdutos();
     const p2 = prods.find(x => String(x.id) === String(prodId));
-    if (p2) { p2.stock = stockFinal; p2.stockAtualizadoEm = movFinal.ts; setProdutos(prods); }
+    let ativou = false;
+    if (p2) { p2.stock = stockFinal; p2.stockAtualizadoEm = movFinal.ts; if (tipo !== 'SAIDA' && p2.rastrear === 'nao') { p2.rastrear = 'sim'; ativou = true; } setProdutos(prods); }
     const movs = getMovs();
     if (!movs.some(m => m.id === movFinal.id)) { movs.unshift(movFinal); setMovs(movs); }
     const dl = +movFinal.qtd || 0;
     registarLog('STOCK_' + tipo, 'Produto', p.ref || p.desc, `${dl>0?'+':''}${dl} · ${movFinal.qtdAntes} → ${movFinal.qtdDepois}`);
     fecharModal();
-    showToast(`Stock: ${fmt(movFinal.qtdAntes)} → ${fmt(movFinal.qtdDepois)}`);
+    showToast(`Stock: ${fmt(movFinal.qtdAntes)} → ${fmt(movFinal.qtdDepois)}${ativou ? ' · controlo de stock activado' : ''}`);
     renderProdList();
   } finally { _movEmCurso = false; btnBusy(btn, false); }
 }
@@ -2048,14 +2050,24 @@ function renderProdList() {
   const wrap = document.getElementById('prod-list-wrap');
   renderAlertasStock();
   if (!prods.length) { wrap.innerHTML = `<div class="empty-state"><div class="big">${ICONS.produtos}</div><p style="font-size:14px;font-weight:600">Nenhum produto guardado</p></div>`; return; }
+  const buscaAtual = document.getElementById('prod-list-search');
+  if (buscaAtual && document.getElementById('prod-list-cards')) { filtrarProdList(buscaAtual.value); return; }
   wrap.innerHTML=`
     <input style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-bottom:14px" placeholder="Pesquisar produto..." oninput="filtrarProdList(this.value)" id="prod-list-search">
     <div id="prod-list-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px"></div>`;
   filtrarProdList('');
 }
+function semAcentos(t) { return String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+function prodCorresponde(p, q) {
+  const termos = semAcentos(q).split(/\s+/).filter(Boolean);
+  if (!termos.length) return true;
+  const txt = semAcentos(String(p.ref == null ? '' : p.ref) + ' ' + String(p.desc == null ? '' : p.desc));
+  return termos.every(t => txt.includes(t));
+}
 function filtrarProdList(q) {
   const prods = getProdutos();
-  const filtrado = q ? prods.filter(p=>(p.ref+p.desc).toLowerCase().includes(q.toLowerCase())) : prods;
+  const filtrado = q ? prods.filter(p => prodCorresponde(p, q)) : prods;
+  if (!filtrado.length) { document.getElementById('prod-list-cards').innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:13px;padding:18px">Nenhum produto encontrado.</div>'; return; }
   document.getElementById('prod-list-cards').innerHTML = filtrado.map(p=>{
     const rastrear = p.rastrear !== 'nao';
     const min = +p.stockMin || 0;
@@ -2081,14 +2093,25 @@ function filtrarProdList(q) {
   }).join('');
 }
 let _prodStockOrig = null, _prodEmCurso = false;
+function setSelectValor(id, val, fallback) {
+  const el = document.getElementById(id);
+  el.querySelectorAll('option[data-extra]').forEach(o => o.remove());
+  val = String(val == null ? '' : val).trim() || fallback;
+  if (!Array.from(el.options).some(o => o.value === val)) {
+    const o = document.createElement('option');
+    o.value = val; o.textContent = id === 'prod-iva' ? val + '%' : val; o.dataset.extra = '1';
+    el.appendChild(o);
+  }
+  el.value = val;
+}
 function abrirModalNovoProduto() {
   _prodStockOrig = null;
   document.getElementById('modal-prod-titulo').textContent = 'Novo Produto';
   document.getElementById('prod-edit-id').value = '';
   ['prod-ref','prod-desc'].forEach(f=>document.getElementById(f).value='');
   document.getElementById('prod-pu').value = '';
-  document.getElementById('prod-un').value = 'Un';
-  document.getElementById('prod-iva').value = '16';
+  setSelectValor('prod-un', 'Un', 'Un');
+  setSelectValor('prod-iva', '16', '16');
   document.getElementById('prod-stock').value = '0';
   document.getElementById('prod-stockmin').value = '0';
   document.getElementById('prod-rastrear').checked = true;
@@ -2103,9 +2126,9 @@ function editarProduto(id) {
   document.getElementById('prod-ref').value = p.ref||'';
   document.getElementById('prod-desc').value = p.desc||'';
   document.getElementById('prod-pu').value = p.pu||0;
-  document.getElementById('prod-un').value = p.un||'Un';
+  setSelectValor('prod-un', p.un, 'Un');
   // IVA 0% é válido: não pode ser tratado como "vazio"
-  document.getElementById('prod-iva').value = (p.iva === 0 || p.iva === '0' || +p.iva > 0) ? String(+p.iva) : '16';
+  setSelectValor('prod-iva', (p.iva === 0 || p.iva === '0' || +p.iva > 0) ? String(+p.iva) : '16', '16');
   document.getElementById('prod-stock').value = _prodStockOrig;
   document.getElementById('prod-stockmin').value = (+p.stockMin || 0);
   document.getElementById('prod-rastrear').checked = p.rastrear !== 'nao';
@@ -2127,6 +2150,12 @@ async function salvarProduto() {
   const stockAlterado = anterior ? (stNovo !== _prodStockOrig) : stNovo > 0;
   const ivaN = parseInt(document.getElementById('prod-iva').value);
   const agora = new Date().toISOString();
+  const outro = ref ? prods.find(p => String(p.id) !== String(anterior ? anterior.id : '') && normTxt(p.ref) === normTxt(ref)) : null;
+  if (outro && !(await uiConfirm(`Já existe um produto com a referência "${ref}" (${outro.desc || '—'}). Guardar mesmo assim?`, { titulo: 'Referência duplicada', tipo: 'warn', okText: 'Guardar mesmo assim' }))) return;
+  let rastrear = document.getElementById('prod-rastrear').checked;
+  if (!rastrear && stNovo > 0 && stockAlterado) {
+    rastrear = await uiConfirm('Indicou stock, mas o controlo de stock está desactivado neste produto. Sem controlo, as vendas não abatem este stock.', { titulo: 'Activar controlo de stock?', tipo: 'warn', okText: 'Activar controlo', cancelText: 'Manter sem controlo' });
+  }
   const prod = {
     id: anterior ? anterior.id : Date.now(),
     ref, desc,
@@ -2135,7 +2164,7 @@ async function salvarProduto() {
     iva: isNaN(ivaN) ? 16 : ivaN,
     stock: anterior ? (stockAlterado ? stNovo : stAntes) : stNovo,
     stockMin: parseFloat(document.getElementById('prod-stockmin').value) || 0,
-    rastrear: document.getElementById('prod-rastrear').checked ? 'sim' : 'nao',
+    rastrear: rastrear ? 'sim' : 'nao',
     stockAtualizadoEm: stockAlterado ? agora : ((anterior && anterior.stockAtualizadoEm) || agora)
   };
   let mov = null;
@@ -2187,9 +2216,9 @@ function abrirProdSel(itemId) {
   document.getElementById('modal-produtos-sel').classList.add('open');
 }
 function renderModalProdutosSel() {
-  const q = document.getElementById('search-prod-sel').value.toLowerCase();
+  const q = document.getElementById('search-prod-sel').value;
   let prods = getProdutos();
-  if (q) prods = prods.filter(p=>(p.ref+p.desc).toLowerCase().includes(q));
+  if (q) prods = prods.filter(p => prodCorresponde(p, q));
   const wrap = document.getElementById('modal-prod-sel-list');
   if (!prods.length) { wrap.innerHTML='<p style="text-align:center;color:var(--muted);padding:16px">Nenhum produto.</p>'; return; }
   wrap.innerHTML='<div class="modal-item-grid">'+prods.map(p=>{
@@ -2201,7 +2230,7 @@ function renderModalProdutosSel() {
   }).join('')+'</div>';
 }
 function selecionarProduto(prodId) {
-  const p = getProdutos().find(x=>x.id===prodId);
+  const p = getProdutos().find(x => String(x.id) === String(prodId));
   if (!p || !_itemParaSel) return;
   const it = items.find(i=>i.id===_itemParaSel);
   if (!it) return;
