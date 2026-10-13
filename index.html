@@ -527,6 +527,7 @@ body.locked{overflow:hidden}
           <input type="text" id="cfg-db-url" value="" readonly style="flex:1;background:#f6f8fc;color:#555;font-family:monospace;font-size:12px">
           <button class="btn btn-secondary btn-sm" onclick="alternarEdicaoDB()" id="btn-edit-db">Alterar</button>
         </div>
+        <div id="cfg-db-nota" style="font-size:11.5px;margin-top:6px"></div>
       </div>
     </div>
     <div class="btn-bar" style="margin-top:10px">
@@ -769,9 +770,19 @@ body.locked{overflow:hidden}
 <script>
 'use strict';
 
+/* ═══════════════════════════════════════════════════════════════════
+   ▼▼▼  CONFIGURAÇÃO DO SITE — PREENCHER ANTES DE PUBLICAR  ▼▼▼
+
+   Cole entre as aspas o URL da Aplicação Web do Apps Script
+   (o que termina em /exec). Com o URL aqui, o site fica ligado à
+   base de dados em qualquer computador ou telemóvel, sem configurar nada.
+
+   Um site novo = copiar este ficheiro + trocar APENAS esta linha.
+   ═══════════════════════════════════════════════════════════════════ */
+const URL_BASE_DADOS = 'https://script.google.com/macros/s/AKfycbyYA1vaTZ38MXBkoEyzvP1WWF0KYtSpBaQOiyth-sGiG4fo1Bif-FG9AA_cQjop7yAy/exec';   // ex.: 'https://script.google.com/macros/s/AKfycb.../exec'
+/* ▲▲▲ FIM DA CONFIGURAÇÃO ▲▲▲ */
+
 const VERSAO_APP = '2026-10-11-v17';
-const _DBC = [104,116,116,112,115,58,47,47,115,99,114,105,112,116,46,103,111,111,103,108,101,46,99,111,109,47,109,97,99,114,111,115,47,115,47,65,75,102,121,99,98,121,89,65,49,118,97,84,90,51,56,77,88,66,107,111,69,121,122,118,80,49,87,87,70,48,75,89,116,83,112,66,97,81,79,105,121,116,104,45,115,71,105,71,52,102,111,49,66,105,102,45,70,71,57,65,65,95,99,81,106,111,112,55,121,65,121,47,101,120,101,99];
-function _dbDef() { return String.fromCharCode.apply(null, _DBC); }
 const _XK = 0x5A;
 function _xEnc(s) { let r = ''; for (let i = 0; i < s.length; i++) r += String.fromCharCode(s.charCodeAt(i) ^ _XK); return btoa(r); }
 function _xDec(s) { try { let d = atob(s), r = ''; for (let i = 0; i < d.length; i++) r += String.fromCharCode(d.charCodeAt(i) ^ _XK); return r; } catch (e) { return ''; } }
@@ -1035,16 +1046,34 @@ let _pollEmCurso = false;
 let _online = true;
 let _nArquivos = 0;
 
+function urlFixoNoCodigo() { return /^https?:\/\//i.test(String(URL_BASE_DADOS || '').trim()); }
 function getDbUrl() {
-  const enc = localStorage.getItem('cfg-db-url');
+  if (urlFixoNoCodigo()) return String(URL_BASE_DADOS).trim();   // definido no index.html: igual em todos os dispositivos
+  const enc = localStorage.getItem('cfg-db-url');                 // alternativa: URL guardado só neste dispositivo
   if (enc) {
     if (enc.startsWith('http')) return enc;
     const dec = _xDec(enc);
     if (dec.startsWith('http')) return dec;
   }
-  return _dbDef();
+  return '';
 }
-function setDbUrl(url) { if (!url) localStorage.removeItem('cfg-db-url'); else localStorage.setItem('cfg-db-url', _xEnc(url)); }
+function setDbUrl(url) {
+  if (urlFixoNoCodigo()) return;                                  // o código manda
+  if (!url) localStorage.removeItem('cfg-db-url'); else localStorage.setItem('cfg-db-url', _xEnc(url));
+}
+function aplicarEstadoUrlConfig() {
+  const inp = document.getElementById('cfg-db-url'), btn = document.getElementById('btn-edit-db'), nota = document.getElementById('cfg-db-nota');
+  if (inp) inp.value = mascararUrl(getDbUrl());
+  const fixo = urlFixoNoCodigo();
+  if (btn) btn.style.display = fixo ? 'none' : '';
+  if (nota) {
+    nota.style.color = fixo ? 'var(--muted)' : '#b45309';
+    nota.textContent = fixo
+      ? 'URL definido no código do index.html — o site liga-se sozinho à base de dados em qualquer dispositivo.'
+      : 'Atenção: o URL não está definido no código (constante URL_BASE_DADOS no index.html). O valor indicado aqui só fica guardado neste dispositivo.';
+  }
+}
+if (!urlFixoNoCodigo()) console.warn('URL_BASE_DADOS não está preenchido no index.html.');
 function temDB() { return !!getDbUrl(); }
 function mascararUrl(u) {
   try {
@@ -1294,8 +1323,7 @@ document.addEventListener('DOMContentLoaded', () => {
   drop.addEventListener('dragleave', () => { drop.style.borderColor = ''; });
   drop.addEventListener('drop', e => { e.preventDefault(); drop.style.borderColor = ''; if (e.dataTransfer.files[0]) loadLogo(e.dataTransfer.files[0]); });
 
-  const dbInput = document.getElementById('cfg-db-url');
-  if (dbInput) dbInput.value = mascararUrl(getDbUrl());
+  aplicarEstadoUrlConfig();
 
   iniciarPolling();
   setInterval(() => {
@@ -3146,7 +3174,9 @@ function fecharModal() {
   libertarNumeroReservado();
   document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('open'));
 }
-document.addEventListener('click', e => { if (e.target.classList.contains('modal-bg') && e.target.id !== 'modal-setup') fecharModal(); });
+// Modais de Produtos/Stock só fecham no X, em Cancelar ou ao guardar (clicar fora ou largar o rato fora não fecha)
+const MODAIS_SEM_FECHO_EXTERIOR = ['modal-setup', 'modal-novo-produto', 'modal-movstock', 'modal-histstock'];
+document.addEventListener('click', e => { if (e.target.classList.contains('modal-bg') && MODAIS_SEM_FECHO_EXTERIOR.indexOf(e.target.id) < 0) fecharModal(); });
 
 function gv(id)  { return (document.getElementById(id)||{}).value||''; }
 function lsv(k)  { return localStorage.getItem(k)||''; }
